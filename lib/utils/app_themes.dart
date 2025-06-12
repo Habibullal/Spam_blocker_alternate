@@ -20,7 +20,6 @@ class AppThemes {
     colorScheme: const ColorScheme.light(
         primary: Color(0xFF007BFF),
         secondary: Color(0xFF0056b3),
-        background: Color(0xFFF4F6F8),
         surface: Colors.white,
     ),
   );
@@ -44,7 +43,6 @@ class AppThemes {
      colorScheme: const ColorScheme.dark(
         primary: Color(0xFF4dabf7),
         secondary: Color(0xFF1e88e5),
-        background: Color(0xFF121212),
         surface: Color(0xFF1E1E1E),
     ),
   );

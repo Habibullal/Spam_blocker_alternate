@@ -21,6 +21,7 @@ class UserRequest {
       'mobile': mobile,
       'deviceId': deviceId,
       'timestamp': timestamp,
+      'status': 'false'
     };
   }
 }

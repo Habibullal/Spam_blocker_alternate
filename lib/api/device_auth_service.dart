@@ -1,12 +1,12 @@
 import 'dart:io';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/foundation.dart';
+import 'package:spam_blocker/api/firestore_service.dart';
 import '../models/user_request.dart';
-import 'local_auth_service.dart'; // <-- IMPORT THE NEW SERVICE
+import 'local_storage_service.dart'; // <-- IMPORT THE NEW SERVICE
 
 class DeviceAuthService {
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final firebaseDB = FirestoreService();
   final DeviceInfoPlugin _deviceInfo = DeviceInfoPlugin();
   final LocalAuthService _localAuthService = LocalAuthService(); // <-- INSTANTIATE IT
 
@@ -33,10 +33,7 @@ class DeviceAuthService {
     if (deviceId == null) return false;
 
     try {
-      final doc = await _firestore.collection('users').doc(deviceId).get();
-      final isRegistered = doc.exists;
-
-      // *** NEW: Save the result locally for offline access ***
+      final isRegistered = await firebaseDB.isDeviceInDB(deviceId);
       await _localAuthService.saveLoginStatus(isRegistered);
 
       return isRegistered;
@@ -50,15 +47,12 @@ class DeviceAuthService {
   // Request access function (no changes here)
   Future<bool> requestAccess(UserRequest request) async {
     try {
-      await _firestore
-          .collection('requests_authentication')
-          .doc(request.deviceId)
-          .set(request.toJson());
-      return true;
+      firebaseDB.sendLoginRequest(request);
     } catch (e) {
       debugPrint("Error sending access request: $e");
       return false;
     }
+    return true;
   }
 
   // *** NEW: A function specifically for logging out ***

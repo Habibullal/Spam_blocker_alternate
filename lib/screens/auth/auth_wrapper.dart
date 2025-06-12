@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:spam_blocker/api/permissions.dart';
 import '../../api/device_auth_service.dart';
-import '../../api/local_auth_service.dart';
+import '../../api/local_storage_service.dart';
 import '../main/main_screen_container.dart';
 import 'request_access_screen.dart';
 import 'splash_screen.dart';
@@ -16,13 +17,41 @@ class _AuthWrapperState extends State<AuthWrapper> {
   final LocalAuthService _localAuth = LocalAuthService();
   final DeviceAuthService _deviceAuth = DeviceAuthService();
 
-  late Future<bool> _isLoggedInLocally;
+  late Future<bool> _isLoggedInLocally, permissionGranted;
 
   @override
   void initState() {
     super.initState();
     // On start, just check the local device storage
     _isLoggedInLocally = _localAuth.isUserLoggedInLocally();
+    checkPermissions();
+  }
+
+  void checkPermissions() async {
+    final permissionGranted = await hasPermissions();
+    if(!permissionGranted){
+      showDialog(
+        context: context, 
+        builder: (ctx) => AlertDialog(
+          title: const Text("Grant Permissions"),
+          content: const Text("Make the App default for 'Caller ID and spam App' and 'Call Redirecting App'"),
+          actions: [
+            OutlinedButton(onPressed: (){
+              Navigator.of(ctx).pop();
+            }, 
+              child: const Text("Deny")
+            ),
+
+            OutlinedButton(onPressed: (){
+              Navigator.of(ctx).pop();
+              changeDefaultApps();
+            }, 
+              child: const Text("Accept")
+            )
+          ],
+        )
+      );
+    }
   }
 
   // This function performs the background check and handles navigation if access is revoked
@@ -33,7 +62,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
         Navigator.of(context).pushAndRemoveUntil(
           MaterialPageRoute(builder: (_) => const RequestAccessScreen(wasKickedOut: true)),
           (route) => false,
-        );
+        ); 
       }
       // If still registered, do nothing. The user is already in the app.
     }).catchError((_) {
@@ -56,6 +85,7 @@ class _AuthWrapperState extends State<AuthWrapper> {
           // 1. User IS logged in locally (fast path)
           // Perform a silent background check to ensure access wasn't revoked
           _validateOnlineAndNavigate();
+          checkPermissions();
           // Immediately let the user into the app
           return const MainScreenContainer();
         } else {
