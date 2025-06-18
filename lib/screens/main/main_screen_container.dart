@@ -20,6 +20,12 @@ class _MainScreenContainerState extends State<MainScreenContainer> {
     const ProfileScreen(),
   ];
 
+  final List<String> _titles = [
+    'Blocked Numbers',
+    'Reported Numbers',
+    'Profile',
+  ];
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -27,26 +33,53 @@ class _MainScreenContainerState extends State<MainScreenContainer> {
 
     return Scaffold(
       body: _screens[_pageIndex],
-      bottomNavigationBar: CurvedNavigationBar(
-        index: _pageIndex,
-        height: 60.0,
-        items: const <Widget>[
-          Icon(Icons.home, size: 30),
-          Icon(Icons.report, size: 30),
-          Icon(Icons.person, size: 30),
-        ],
-        color: isDarkMode ? AppThemes.darkTheme.cardColor : Colors.white,
-        buttonBackgroundColor: isDarkMode ? AppThemes.darkTheme.primaryColor : AppThemes.lightTheme.primaryColor,
-        backgroundColor: Colors.transparent, // Make it transparent to show scaffold bg
-        animationCurve: Curves.easeInOut,
-        animationDuration: const Duration(milliseconds: 400),
-        onTap: (index) {
-          setState(() {
-            _pageIndex = index;
-          });
-        },
-        letIndexChange: (index) => true,
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          boxShadow: [
+            BoxShadow(
+              color: isDarkMode 
+                  ? Colors.black.withOpacity(0.3)
+                  : Colors.grey.withOpacity(0.2),
+              spreadRadius: 0,
+              blurRadius: 10,
+              offset: const Offset(0, -5),
+            ),
+          ],
+        ),
+        child: CurvedNavigationBar(
+          index: _pageIndex,
+          height: 65.0,
+          items: [
+            _buildNavItem(Icons.shield, 0),
+            _buildNavItem(Icons.report, 1),
+            _buildNavItem(Icons.person, 2),
+          ],
+          color: theme.colorScheme.surface,
+          buttonBackgroundColor: theme.colorScheme.primary,
+          backgroundColor: Colors.transparent,
+          animationCurve: Curves.easeInOutCubic,
+          animationDuration: const Duration(milliseconds: 400),
+          onTap: (index) {
+            setState(() {
+              _pageIndex = index;
+            });
+          },
+          letIndexChange: (index) => true,
+        ),
       ),
+    );
+  }
+
+  Widget _buildNavItem(IconData icon, int index) {
+    final theme = Theme.of(context);
+    final isSelected = _pageIndex == index;
+    
+    return Icon(
+      icon,
+      size: 28,
+      color: isSelected 
+          ? Colors.white 
+          : theme.colorScheme.onSurface.withOpacity(0.6),
     );
   }
 }
