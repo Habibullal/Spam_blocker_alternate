@@ -33,16 +33,16 @@ class LocalBlockedNumbersStorage{
       return _cache;
     }
     final prefs = await SharedPreferences.getInstance();
-    final list = prefs.getStringList(_authStatusKey) ?? <String>[];
+    final list = prefs.getString(_authStatusKey) ?? "";
     print("Cost");
 
-    _cache = list.toSet();
+    _cache = list.split("|").toSet();
     return _cache;
   }
 
   Future<void> updateNumbers() async {
     final prefs = await SharedPreferences.getInstance();
-    prefs.setStringList(_authStatusKey, _cache.toList());
+    prefs.setString(_authStatusKey, _cache.join("|"));
   }
 
   void addNumbers(String number){

@@ -12,7 +12,7 @@ class OutgoingService : CallRedirectionService() {
         allowInteractiveResponse: Boolean
     ) {
         val number = handle.schemeSpecificPart
-        FlutterBridge.checkNumber(number) { isValid ->
+        getNumber.checkNumber(this, number) { isValid ->
             Log.d("e", isValid.toString())
             if (isValid) {
                 Log.d("outgoing", "Call blocked")

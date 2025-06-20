@@ -1,22 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:spam_blocker/api/firestore_service.dart';
 import 'package:spam_blocker/api/local_storage_service.dart';
 
-void foo1(){
-  final f = FirestoreService();
-  f.fetchNumbers();
-}
-void foo2(){
-  LocalBlockedNumbersStorage.instance.addNumbers("8284811887");
-}
-void foo3(){
-  LocalBlockedNumbersStorage.instance.delNumber("8284811887");
-}
-void foo4()async {
-  Set<String> ms = await LocalBlockedNumbersStorage.instance.getNumbers();
-  print("$ms");
-}
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -61,83 +46,83 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  Future<void> _removeNumber(String number) async {
-    try {
-      // await LocalBlockedNumbersStorage.instance.delNumber(number);
-      setState(() => _blockedNumbers.remove(number));
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Removed $number from blocked list'),
-          backgroundColor: Colors.green,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        ),
-      );
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to remove number'),
-          backgroundColor: Colors.red,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        ),
-      );
-    }
-  }
+  // Future<void> _removeNumber(String number) async {
+  //   try {
+  //     // await LocalBlockedNumbersStorage.instance.delNumber(number);
+  //     setState(() => _blockedNumbers.remove(number));
+  //     ScaffoldMessenger.of(context).showSnackBar(
+  //       SnackBar(
+  //         content: Text('Removed $number from blocked list'),
+  //         backgroundColor: Colors.green,
+  //         behavior: SnackBarBehavior.floating,
+  //         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+  //       ),
+  //     );
+  //   } catch (e) {
+  //     ScaffoldMessenger.of(context).showSnackBar(
+  //       SnackBar(
+  //         content: Text('Failed to remove number'),
+  //         backgroundColor: Colors.red,
+  //         behavior: SnackBarBehavior.floating,
+  //         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+  //       ),
+  //     );
+  //   }
+  // }
 
-  Future<void> _addNumber() async {
-    final TextEditingController controller = TextEditingController();
+  // Future<void> _addNumber() async {
+  //   final TextEditingController controller = TextEditingController();
     
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Add Number to Block'),
-        content: TextField(
-          controller: controller,
-          keyboardType: TextInputType.phone,
-          decoration: const InputDecoration(
-            hintText: 'Enter phone number',
-            border: OutlineInputBorder(),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              if (controller.text.isNotEmpty) {
-                try {
-                // await LocalBlockedNumbersStorage.instance.addNumbers(controller.text);
-                  setState(() => _blockedNumbers.add(controller.text));
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Added ${controller.text} to blocked list'),
-                      backgroundColor: Colors.green,
-                      behavior: SnackBarBehavior.floating,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                    ),
-                  );
-                } catch (e) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: const Text('Failed to add number'),
-                      backgroundColor: Colors.red,
-                      behavior: SnackBarBehavior.floating,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                    ),
-                  );
-                }
-              }
-            },
-            child: const Text('Add'),
-          ),
-        ],
-      ),
-    );
-  }
+  //   showDialog(
+  //     context: context,
+  //     builder: (context) => AlertDialog(
+  //       title: const Text('Add Number to Block'),
+  //       content: TextField(
+  //         controller: controller,
+  //         keyboardType: TextInputType.phone,
+  //         decoration: const InputDecoration(
+  //           hintText: 'Enter phone number',
+  //           border: OutlineInputBorder(),
+  //         ),
+  //       ),
+  //       actions: [
+  //         TextButton(
+  //           onPressed: () => Navigator.pop(context),
+  //           child: const Text('Cancel'),
+  //         ),
+  //         ElevatedButton(
+  //           onPressed: () async {
+  //             if (controller.text.isNotEmpty) {
+  //               try {
+  //               // await LocalBlockedNumbersStorage.instance.addNumbers(controller.text);
+  //                 setState(() => _blockedNumbers.add(controller.text));
+  //                 Navigator.pop(context);
+  //                 ScaffoldMessenger.of(context).showSnackBar(
+  //                   SnackBar(
+  //                     content: Text('Added ${controller.text} to blocked list'),
+  //                     backgroundColor: Colors.green,
+  //                     behavior: SnackBarBehavior.floating,
+  //                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+  //                   ),
+  //                 );
+  //               } catch (e) {
+  //                 ScaffoldMessenger.of(context).showSnackBar(
+  //                   SnackBar(
+  //                     content: const Text('Failed to add number'),
+  //                     backgroundColor: Colors.red,
+  //                     behavior: SnackBarBehavior.floating,
+  //                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+  //                   ),
+  //                 );
+  //               }
+  //             }
+  //           },
+  //           child: const Text('Add'),
+  //         ),
+  //       ],
+  //     ),
+  //   );
+  // }
 
   @override
   Widget build(BuildContext context) {
@@ -159,11 +144,11 @@ class _HomeScreenState extends State<HomeScreen> {
           : _blockedNumbers.isEmpty
               ? _buildEmptyState()
               : _buildNumbersList(),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _addNumber,
-        child: const Icon(Icons.add),
-        tooltip: 'Add Number',
-      ),
+      // floatingActionButton: FloatingActionButton(
+      //   onPressed: _addNumber,
+      //   child: const Icon(Icons.add),
+      //   tooltip: 'Add Number',
+      // ),
     );
   }
 
@@ -183,16 +168,16 @@ class _HomeScreenState extends State<HomeScreen> {
             style: Theme.of(context).textTheme.titleLarge,
           ),
           const SizedBox(height: 8),
-          Text(
-            'Add numbers to block spam calls',
-            style: Theme.of(context).textTheme.bodyMedium,
-          ),
-          const SizedBox(height: 24),
-          ElevatedButton.icon(
-            onPressed: _addNumber,
-            icon: const Icon(Icons.add),
-            label: const Text('Add Number'),
-          ),
+          // Text(
+          //   'Add numbers to block spam calls',
+          //   style: Theme.of(context).textTheme.bodyMedium,
+          // ),
+          // const SizedBox(height: 24),
+          // ElevatedButton.icon(
+          //   onPressed: _addNumber,
+          //   icon: const Icon(Icons.add),
+          //   label: const Text('Add Number'),
+          // ),
         ],
       ),
     );
@@ -231,57 +216,57 @@ class _HomeScreenState extends State<HomeScreen> {
                 color: Theme.of(context).colorScheme.error,
               ),
             ),
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                IconButton(
-                  onPressed: () => _showReportDialog(number),
-                  icon: const Icon(Icons.report),
-                  color: Theme.of(context).colorScheme.secondary,
-                  tooltip: 'Report as spam',
-                ),
-                IconButton(
-                  onPressed: () => _removeNumber(number),
-                  icon: const Icon(Icons.delete),
-                  color: Theme.of(context).colorScheme.error,
-                  tooltip: 'Remove from blocked list',
-                ),
-              ],
-            ),
+            // trailing: Row(
+            //   mainAxisSize: MainAxisSize.min,
+            //   children: [
+            //     IconButton(
+            //       onPressed: () => _showReportDialog(number),
+            //       icon: const Icon(Icons.report),
+            //       color: Theme.of(context).colorScheme.secondary,
+            //       tooltip: 'Report as spam',
+            //     ),
+            //     IconButton(
+            //       onPressed: () => _removeNumber(number),
+            //       icon: const Icon(Icons.delete),
+            //       color: Theme.of(context).colorScheme.error,
+            //       tooltip: 'Remove from blocked list',
+            //     ),
+            //   ],
+            // ),
           ),
         );
       },
     );
   }
 
-  void _showReportDialog(String number) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Report Spam'),
-        content: Text('Report $number as spam to help protect others?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              // Add your spam reporting logic here
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Reported $number as spam'),
-                  backgroundColor: Colors.green,
-                  behavior: SnackBarBehavior.floating,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                ),
-              );
-            },
-            child: const Text('Report'),
-          ),
-        ],
-      ),
-    );
-  }
+  // void _showReportDialog(String number) {
+  //   showDialog(
+  //     context: context,
+  //     builder: (context) => AlertDialog(
+  //       title: const Text('Report Spam'),
+  //       content: Text('Report $number as spam to help protect others?'),
+  //       actions: [
+  //         TextButton(
+  //           onPressed: () => Navigator.pop(context),
+  //           child: const Text('Cancel'),
+  //         ),
+  //         ElevatedButton(
+  //           onPressed: () {
+  //             // Add your spam reporting logic here
+  //             Navigator.pop(context);
+  //             ScaffoldMessenger.of(context).showSnackBar(
+  //               SnackBar(
+  //                 content: Text('Reported $number as spam'),
+  //                 backgroundColor: Colors.green,
+  //                 behavior: SnackBarBehavior.floating,
+  //                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+  //               ),
+  //             );
+  //           },
+  //           child: const Text('Report'),
+  //         ),
+  //       ],
+  //     ),
+  //   );
+  // }
 }

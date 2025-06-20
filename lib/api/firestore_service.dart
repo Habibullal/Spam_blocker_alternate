@@ -10,13 +10,14 @@ class FirestoreService {
 
   FirestoreService(){
     _firestore.settings = const Settings(persistenceEnabled: false);
-    fetchNumbers();
+     fetchNumbers();
 
-    StreamSubscription<DocumentSnapshot> numberSub = _firestore.collection("BlockedNumbers").doc("numbers").snapshots().listen((DocumentSnapshot snapshot){
-      if(!snapshot.exists) return;
-      fetchNumbers();
-      print("boo");
-    });
+  //   StreamSubscription<DocumentSnapshot> numberSub = _firestore.collection("BlockedNumbers").doc("numbers").snapshots().listen((DocumentSnapshot snapshot){
+  //     if(!snapshot.exists) return;
+  //     fetchNumbers();
+  //     print("boo");
+  //   });
+  // }
   }
 
   Future<bool> isDeviceInDB(String? deviceId) async {

@@ -12,7 +12,6 @@ class MainActivity: FlutterActivity() {
 
   override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
     super.configureFlutterEngine(flutterEngine)
-    FlutterBridge.init(flutterEngine.dartExecutor.binaryMessenger)
 
     methodChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL)
     methodChannel.setMethodCallHandler { call, result ->
