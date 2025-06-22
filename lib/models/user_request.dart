@@ -17,11 +17,11 @@ class UserRequest {
   Map<String, dynamic> toJson() {
     return {
       'name': name,
-      'email': email,
+      //'email': email,
       'mobile': mobile,
-      'deviceId': deviceId,
-      'timestamp': timestamp,
-      'status': 'false'
+      'UUID': deviceId,
+      'createdAt': timestamp,
+      'authenticated': false
     };
   }
 }

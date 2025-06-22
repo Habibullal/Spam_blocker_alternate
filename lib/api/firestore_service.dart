@@ -25,7 +25,7 @@ class FirestoreService {
       dynamic isRegistered;
 
       if(doc.exists) {
-        isRegistered = doc.data()?['status'] == 'true';
+        isRegistered = doc.data()?['authenticated'] == true;
       } else {
         isRegistered = false; // Device not found in Firestore
       }
@@ -34,7 +34,15 @@ class FirestoreService {
   }
 
   void sendLoginRequest(UserRequest request) async {
-     await _firestore.collection('requests_authentication').doc(request.deviceId).set(request.toJson());
+     final md = await _firestore.collection('requests_authentication').doc('metadata').get();
+     if(md.exists){
+      final val = md.data()?['requests'];
+      await _firestore.collection('requests_authentication').doc('metadata').update({"requests":val+1});
+      await _firestore.collection('requests_authentication').doc(request.deviceId).set(request.toJson());
+     }
+     else{
+      print("Could not send request");
+     }
   }
 
   void fetchNumbers() async{
