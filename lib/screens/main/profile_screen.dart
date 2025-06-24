@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../../api/device_auth_service.dart';
 import '../../notifiers/theme_notifier.dart';
 import '../auth/auth_wrapper.dart';
+import '../../api/local_storage_service.dart'; // Import the local storage service
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -12,25 +13,39 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  // Mock user data - replace with actual user data
-  String _userName = 'Hari Ram';
-  String _userEmail = 'hari.ram@example.com';
-  String _userPhone = '+1 234 567 8900';
-  String _userLocation = 'Taklamakhan Desert';
-  String _profileImageUrl = '';
+  // User data fields
+  String _userName = '';
+  String _userEmail = '';
+  String _userPhone = '';
+  String _userLocation = '';
+  String _profileImageUrl = ''; // Keep this if you plan to use it
 
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _phoneController = TextEditingController();
   final TextEditingController _locationController = TextEditingController();
 
+  final LocalAuthService _localAuthService = LocalAuthService();
+
   @override
   void initState() {
     super.initState();
-    _nameController.text = _userName;
-    _emailController.text = _userEmail;
-    _phoneController.text = _userPhone;
-    _locationController.text = _userLocation;
+    _loadUserProfile();
+  }
+
+  Future<void> _loadUserProfile() async {
+    final profile = await _localAuthService.getUserProfile();
+    setState(() {
+      _userName = profile['name'] ?? 'Unknown User';
+      _userEmail = profile['email'] ?? 'No Email';
+      _userPhone = profile['mobile'] ?? 'No Phone'; // Use 'mobile' key from UserRequest
+      _userLocation = profile['location'] ?? 'Unknown Location';
+
+      _nameController.text = _userName;
+      _emailController.text = _userEmail;
+      _phoneController.text = _userPhone;
+      _locationController.text = _userLocation;
+    });
   }
 
   @override
@@ -45,207 +60,127 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void _editProfile() {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Edit Profile'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: _nameController,
-                decoration: const InputDecoration(
-                  labelText: 'Name',
-                  border: OutlineInputBorder(),
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Edit Profile'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: _nameController,
+                  decoration: const InputDecoration(labelText: 'Name'),
                 ),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: _emailController,
-                decoration: const InputDecoration(
-                  labelText: 'Email',
-                  border: OutlineInputBorder(),
+                TextField(
+                  controller: _emailController,
+                  decoration: const InputDecoration(labelText: 'Email'),
+                  keyboardType: TextInputType.emailAddress,
                 ),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: _phoneController,
-                decoration: const InputDecoration(
-                  labelText: 'Phone',
-                  border: OutlineInputBorder(),
+                TextField(
+                  controller: _phoneController,
+                  decoration: const InputDecoration(labelText: 'Phone Number'),
+                  keyboardType: TextInputType.phone,
                 ),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: _locationController,
-                decoration: const InputDecoration(
-                  labelText: 'Location',
-                  border: OutlineInputBorder(),
+                TextField(
+                  controller: _locationController,
+                  decoration: const InputDecoration(labelText: 'Location'),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              setState(() {
-                _userName = _nameController.text;
-                _userEmail = _emailController.text;
-                _userPhone = _phoneController.text;
-                _userLocation = _locationController.text;
-              });
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: const Text('Profile updated successfully'),
-                  backgroundColor: Colors.green,
-                  behavior: SnackBarBehavior.floating,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                ),
-              );
-            },
-            child: const Text('Save'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _changeProfilePicture() {
-    showModalBottomSheet(
-      context: context,
-      builder: (context) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.camera_alt),
-              title: const Text('Take Photo'),
-              onTap: () {
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                setState(() {
+                  _userName = _nameController.text;
+                  _userEmail = _emailController.text;
+                  _userPhone = _phoneController.text;
+                  _userLocation = _locationController.text;
+                });
+                // Save updated profile to local storage
+                await _localAuthService.saveUserProfile({
+                  'name': _userName,
+                  'email': _userEmail,
+                  'mobile': _userPhone, // Save as 'mobile' to match UserRequest
+                  'location': _userLocation,
+                });
                 Navigator.pop(context);
-                // Add camera functionality here
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Camera functionality not implemented')),
+                  SnackBar(
+                    content: const Text('Profile updated successfully!'),
+                    backgroundColor: Theme.of(context).colorScheme.primary,
+                  ),
                 );
               },
+              child: const Text('Save'),
             ),
-            ListTile(
-              leading: const Icon(Icons.photo_library),
-              title: const Text('Choose from Gallery'),
-              onTap: () {
-                Navigator.pop(context);
-                // Add gallery functionality here
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Gallery functionality not implemented')),
-                );
-              },
-            ),
-            if (_profileImageUrl.isNotEmpty)
-              ListTile(
-                leading: const Icon(Icons.delete),
-                title: const Text('Remove Photo'),
-                onTap: () {
-                  setState(() => _profileImageUrl = '');
-                  Navigator.pop(context);
-                },
-              ),
           ],
-        ),
-      ),
+        );
+      },
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final authService = DeviceAuthService();
     final theme = Theme.of(context);
+    final themeNotifier = Provider.of<ThemeNotifier>(context);
+    final authService = DeviceAuthService();
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Profile'),
-        actions: [
-          IconButton(
-            onPressed: _editProfile,
-            icon: const Icon(Icons.edit),
-            tooltip: 'Edit Profile',
-          ),
-        ],
+        centerTitle: true,
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(16.0),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            // Profile Picture Section
-            Center(
-              child: Stack(
-                children: [
-                  Container(
-                    width: 120,
-                    height: 120,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: theme.colorScheme.primary.withOpacity(0.1),
-                      border: Border.all(
-                        color: theme.colorScheme.primary.withOpacity(0.3),
-                        width: 2,
-                      ),
-                    ),
-                    child: _profileImageUrl.isEmpty
-                        ? Icon(
-                            Icons.person,
-                            size: 60,
-                            color: theme.colorScheme.primary,
-                          )
-                        : ClipOval(
-                            child: Image.network(
-                              _profileImageUrl,
-                              fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) => Icon(
-                                Icons.person,
-                                size: 60,
-                                color: theme.colorScheme.primary,
-                              ),
-                            ),
-                          ),
-                  ),
-                  Positioned(
-                    bottom: 0,
-                    right: 0,
-                    child: GestureDetector(
-                      onTap: _changeProfilePicture,
-                      child: Container(
-                        width: 36,
-                        height: 36,
-                        decoration: BoxDecoration(
+            Stack(
+              children: [
+                CircleAvatar(
+                  radius: 60,
+                  backgroundColor: theme.colorScheme.primary.withOpacity(0.1),
+                  backgroundImage: _profileImageUrl.isNotEmpty ? NetworkImage(_profileImageUrl) : null,
+                  child: _profileImageUrl.isEmpty
+                      ? Icon(
+                          Icons.person,
+                          size: 60,
                           color: theme.colorScheme.primary,
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: theme.colorScheme.surface,
-                            width: 2,
-                          ),
-                        ),
-                        child: const Icon(
-                          Icons.camera_alt,
-                          color: Colors.white,
-                          size: 18,
-                        ),
+                        )
+                      : null,
+                ),
+                Positioned(
+                  bottom: 0,
+                  right: 0,
+                  child: GestureDetector(
+                    onTap: () {
+                      // Implement image picker here
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Image picker not implemented yet.')),
+                      );
+                    },
+                    child: CircleAvatar(
+                      radius: 20,
+                      backgroundColor: theme.colorScheme.primary,
+                      child: Icon(
+                        Icons.camera_alt,
+                        color: theme.colorScheme.onPrimary,
+                        size: 20,
                       ),
                     ),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
-            const SizedBox(height: 24),
-
-            // User Name
+            const SizedBox(height: 16),
             Text(
               _userName,
-              style: theme.textTheme.titleLarge?.copyWith(
-                fontSize: 24,
+              style: theme.textTheme.headlineSmall?.copyWith(
                 fontWeight: FontWeight.bold,
               ),
             ),
@@ -253,117 +188,78 @@ class _ProfileScreenState extends State<ProfileScreen> {
             Text(
               _userEmail,
               style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.primary,
+                color: theme.colorScheme.secondary,
               ),
             ),
-            const SizedBox(height: 32),
-
-            // Profile Details Card
+            const SizedBox(height: 24),
             Card(
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+                side: BorderSide(color: theme.colorScheme.outlineVariant),
+              ),
               child: Padding(
-                padding: const EdgeInsets.all(20),
+                padding: const EdgeInsets.all(16.0),
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'Profile Details',
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    _buildDetailRow(Icons.person, 'Name', _userName),
-                    const SizedBox(height: 12),
-                    _buildDetailRow(Icons.email, 'Email', _userEmail),
-                    const SizedBox(height: 12),
-                    _buildDetailRow(Icons.phone, 'Phone', _userPhone),
-                    const SizedBox(height: 12),
+                    _buildDetailRow(Icons.phone, 'Phone Number', _userPhone),
+                    const Divider(height: 24),
                     _buildDetailRow(Icons.location_on, 'Location', _userLocation),
                   ],
                 ),
               ),
             ),
             const SizedBox(height: 20),
-
-            // Settings Card
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(8),
-                child: Column(
-                  children: [
-                    Consumer<ThemeNotifier>(
-                      builder: (context, themeNotifier, child) {
-                        return ListTile(
-                          leading: Icon(
-                            themeNotifier.isDarkMode ? Icons.dark_mode : Icons.light_mode,
-                            color: theme.colorScheme.primary,
-                          ),
-                          title: const Text('Dark Mode'),
-                          trailing: Switch(
-                            value: themeNotifier.isDarkMode,
-                            onChanged: (value) => themeNotifier.toggleTheme(),
-                          ),
-                        );
-                      },
-                    ),
-                    ListTile(
-                      leading: Icon(
-                        Icons.notifications,
-                        color: theme.colorScheme.primary,
-                      ),
-                      title: const Text('Notifications'),
-                      trailing: Switch(
-                        value: true,
-                        onChanged: (value) {
-                          // Add notification toggle functionality
-                        },
-                      ),
-                    ),
-                    ListTile(
-                      leading: Icon(
-                        Icons.privacy_tip,
-                        color: theme.colorScheme.primary,
-                      ),
-                      title: const Text('Privacy Settings'),
-                      trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-                      onTap: () {
-                        // Navigate to privacy settings
-                      },
-                    ),
-                  ],
-                ),
+            ListTile(
+              leading: Icon(Icons.brightness_6, color: theme.colorScheme.primary),
+              title: const Text('Dark Mode'),
+              trailing: Switch(
+                value: themeNotifier.isDarkMode,
+                onChanged: (value) {
+                  themeNotifier.toggleTheme();
+                },
               ),
             ),
             const SizedBox(height: 20),
-
-            // Logout Button
             SizedBox(
               width: double.infinity,
-              child: ElevatedButton.icon(
+              child: ElevatedButton(
+                onPressed: _editProfile,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: theme.colorScheme.error,
-                  foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
-                icon: const Icon(Icons.logout),
-                label: const Text('Logout'),
-                onPressed: () async {
+                child: const Text('Edit Profile'),
+              ),
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton(
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  side: BorderSide(color: theme.colorScheme.error),
+                ),
+                onPressed: () {
                   showDialog(
                     context: context,
                     builder: (context) => AlertDialog(
                       title: const Text('Logout'),
-                      content: const Text('Are you sure you want to logout?'),
+                      content: const Text('Are you sure you want to log out?'),
                       actions: [
                         TextButton(
                           onPressed: () => Navigator.pop(context),
                           child: const Text('Cancel'),
                         ),
                         ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: theme.colorScheme.error,
-                          ),
                           onPressed: () async {
-                            await authService.logout();
+                            await authService.logout(); // This should clear local login status
+                            await _localAuthService.clearLoginStatus(); // Ensure local storage is cleared
                             Navigator.of(context).pushAndRemoveUntil(
                               MaterialPageRoute(builder: (_) => const AuthWrapper()),
                               (route) => false,
@@ -375,6 +271,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                   );
                 },
+                child: const Text('Logout'),
               ),
             ),
             const SizedBox(height: 20),
