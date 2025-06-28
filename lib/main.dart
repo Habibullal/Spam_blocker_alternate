@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'api/permissions.dart';
 import 'package:provider/provider.dart';
 import 'notifiers/theme_notifier.dart';
 import 'screens/auth/auth_wrapper.dart';
@@ -10,6 +11,11 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   // Initialize Firebase
   await Firebase.initializeApp();
+  await channel.invokeMethod<bool>('TriggerSnapshot');
+
+  // final Map<String, String> m = {"number":"+911098765431"};
+  // print((await channel.invokeMethod('CheckBlocked',m)) ?? false);
+
   runApp(const MyApp());
 }
 

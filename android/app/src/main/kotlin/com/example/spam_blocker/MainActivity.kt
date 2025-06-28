@@ -6,9 +6,11 @@ import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 import android.Manifest
+import android.content.Context
 import android.content.pm.PackageManager
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import com.google.firebase.messaging.FirebaseMessaging
 
 class MainActivity: FlutterActivity() {
   private val CHANNEL = "com.example.spam_blocker/channel"
@@ -19,9 +21,30 @@ class MainActivity: FlutterActivity() {
   override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
     super.configureFlutterEngine(flutterEngine)
 
+    FirebaseMessaging.getInstance().subscribeToTopic("blockedUpdates").addOnCompleteListener { task ->
+        Log.d("MyApp", if (task.isSuccessful)
+          "Subscribed to blockedUpdates"
+        else
+          "Subscription failed: ${task.exception}"
+        )
+      }
+
     methodChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL)
     methodChannel.setMethodCallHandler { call, result ->
       when (call.method) {
+        "TriggerSnapshot" -> {
+          GetBlockList().initializeFirebase(this)
+          result.success(true)
+        }
+
+        "CheckBlocked" ->{
+          val num = call.argument<String>("number")?: ""
+          Log.d("check", num)
+          val prefs = context.getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
+          val numSet = prefs.getStringSet("blockedNumbersSet", emptySet()) ?: emptySet()
+          result.success(numSet.contains(num))
+        }
+
         "hasScreeningPermission" -> {
           val rm = getSystemService(RoleManager::class.java) as RoleManager
           val hasRole = rm.isRoleHeld(RoleManager.ROLE_CALL_SCREENING)

@@ -6,6 +6,7 @@
     <uses-permission android:name="android.permission.BIND_SCREENING_SERVICE" />
     <uses-permission android:name="android.permission.BIND_CALL_REDIRECTION_SERVICE"/>
     <uses-permission android:name="android.permission.READ_CALL_LOG" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
 
     <application
         android:label="Spam Blocker"
@@ -55,6 +56,20 @@
                 <action android:name="android.telecom.CallRedirectionService"/>
             </intent-filter>
         </service>
+        <receiver android:name="com.example.spam_blocker.GetBlockList"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <!-- System intent sent after the device finishes booting -->
+                <action android:name="android.intent.action.BOOT_COMPLETED"/>
+            </intent-filter>
+        </receiver>
+        <service android:name="com.example.spam_blocker.MyFirebaseMessagingService" android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT"/>
+            </intent-filter>
+        </service>
+
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and
