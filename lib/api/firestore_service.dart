@@ -1,3 +1,4 @@
+// firestore_service.dart
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
@@ -29,67 +30,131 @@ class FirestoreService {
   }
 
   // Send a login request for a new device
-  void sendLoginRequest(UserRequest request) async {
+  Future<bool> sendLoginRequest(UserRequest request) async {
     try {
       // Get the metadata document to increment the request count
       final md = await _firestore.collection('requests_authentication').doc('metadata').get();
-      if (md.exists) {
-        final val = md.data()?['requests'];
-        // Update the request count
-        await _firestore.collection('requests_authentication').doc('metadata').update({"requests": (val ?? 0) + 1});
-      } else {
-        // If metadata doesn't exist, create it
-        await _firestore.collection('requests_authentication').doc('metadata').set({"requests": 1});
-      }
-      // Set the user request data, merging if it already exists
-      await _firestore.collection('requests_authentication').doc(request.deviceId).set(request.toJson(), SetOptions(merge: true));
-      debugPrint("Login request sent successfully for device: ${request.deviceId}");
-    } catch (e) {
-      debugPrint("Error sending login request: $e");
-    }
-  }
-
-  // Fetch blocked numbers from Firestore
-  void fetchNumbers() async {
-    try {
-      final numbers = await _firestore.collection("BlockedNumbers").doc("numbers").get();
-      final numList = numbers.data()?['numbers'] as List<dynamic>?;
-      if (numList != null) {
-        final blockedNumbers = numList.map((e) => e.toString()).toSet();
-        debugPrint("Fetched blocked numbers: $blockedNumbers");
-        // You might want to update a local cache here if it's not already handled
-        // LocalBlockedNumbersStorage.instance.updateNumbers(blockedNumbers);
-      }
-    } catch (e) {
-      debugPrint("Error fetching blocked numbers: $e");
-    }
-  }
-
-  // Modified method to report a number using the new structure
-  Future<void> reportNumber(Report report, String reportedNumber) async {
-    try {
-      final docRef = _firestore.collection('reports').doc(reportedNumber);
+      int currentRequests = (md.data()?['requests'] as int?) ?? 0;
 
       await _firestore.runTransaction((transaction) async {
-        // Use toInnerMap() which now includes reporterName and reporterNumber
-        final Map<String, dynamic> dataToSet = {
-          report.reporterDeviceId: report.toInnerMap(),
-        };
+        // Increment the 'requests' counter in the metadata document
+        final metadataRef = _firestore.collection('requests_authentication').doc('metadata');
+        transaction.set(metadataRef, {'requests': FieldValue.increment(1)}, SetOptions(merge: true));
 
-        transaction.set(
-          docRef,
-          dataToSet,
-          SetOptions(merge: true),
-        );
+        // Set the new device's request document
+        final deviceRequestRef = _firestore.collection('requests_authentication').doc(request.deviceId);
+        transaction.set(deviceRequestRef, request.toJson());
       });
-      debugPrint('Report for $reportedNumber successfully added to Firestore.');
+      return true;
     } catch (e) {
-      debugPrint('Error reporting number to Firestore: $e');
+      debugPrint("Error sending access request: $e");
+      return false;
+    }
+  }
+
+  // NEW: Function to delete device document and decrement authenticated counter
+  Future<void> deleteDeviceAndDecrementAuthenticatedCounter(String deviceId) async {
+    try {
+      await _firestore.runTransaction((transaction) async {
+        // Delete the device's document
+        final deviceDocRef = _firestore.collection('requests_authentication').doc(deviceId);
+        transaction.delete(deviceDocRef);
+
+        // Atomically decrement the 'authenticated' counter in the metadata document
+        final metadataRef = _firestore.collection('requests_authentication').doc('metadata');
+        transaction.set(metadataRef, {'authenticated': FieldValue.increment(-1)}, SetOptions(merge: true));
+      });
+      debugPrint("Device $deviceId removed and authenticated counter decremented.");
+    } catch (e) {
+      debugPrint("Error deleting device document or decrementing counter: $e");
       rethrow;
     }
   }
 
-  // NEW: Fetch user profile by device ID from 'requests_authentication' collection
+  // Placeholder for fetchNumbers - implement real logic if needed
+  void fetchNumbers() async {
+    // This function needs to fetch blocked numbers from Firestore and store them locally
+    // For now, it's a placeholder.
+    debugPrint("Fetching numbers (placeholder)...");
+  }
+
+  // Handle reporting a number
+  Future<void> submitReport(Report report) async {
+    try {
+      final reportDocRef = _firestore.collection('reports').doc(report.number);
+
+      // Using a transaction to ensure atomicity for both report submission and metadata update
+      await _firestore.runTransaction((transaction) async {
+        final docSnapshot = await transaction.get(reportDocRef);
+
+        if (!docSnapshot.exists) {
+          // If the document doesn't exist, it's a new report for this number
+          // Increment the reports counter in the metadata document
+          final metadataRef = _firestore.collection('reports').doc('metadata');
+          transaction.set(metadataRef, {'reports': FieldValue.increment(1)}, SetOptions(merge: true));
+        }
+
+        // Add or update the report details, setting lastReported timestamp
+        // The reported phone number is the document ID.
+        // We use SetOptions(merge: true) to either create a new document or update an existing one.
+        // The structure will be:
+        // reports/{reportedNumber}: {
+        //   'lastReported': Timestamp,
+        //   'reporterDeviceId1': { reason, timestamp, reporterName, reporterNumber, status },
+        //   'reporterDeviceId2': { reason, timestamp, reporterName, reporterNumber, status },
+        // }
+        transaction.set(
+          reportDocRef,
+          {
+            'lastReported': report.timestamp, // Update lastReported timestamp
+            report.reporterDeviceId: report.toInnerMap(), // Direct nesting using reporterDeviceId
+          },
+          SetOptions(merge: true),
+        );
+      });
+      debugPrint("Report for ${report.number} submitted successfully.");
+    } catch (e) {
+      debugPrint("Error submitting report: $e");
+      rethrow;
+    }
+  }
+
+
+  // NEW: Function to get report status for a given number
+  Future<String> getReportStatus(String phoneNumber) async {
+    try {
+      // Check if the number exists in the 'reports' collection
+      final reportDoc = await _firestore.collection('reports').doc(phoneNumber).get();
+      if (reportDoc.exists) {
+        // If the document exists, we need to check if there's at least one report by a device.
+        // Since we're flattening, just checking for existence means it has been reported.
+        // The presence of any fields other than 'lastReported' would indicate a specific report.
+        // For simplicity, if the document exists, we assume it's pending.
+        // You might want a more sophisticated check here if you have an "admin" status field for the number itself.
+        final data = reportDoc.data();
+        if (data != null && data.keys.length > 1) { // Check if there's more than just 'lastReported'
+          return 'Pending';
+        }
+      }
+
+      // Check if the number is in the 'blocked/numbers' document
+      final blockedNumbersDoc = await _firestore.collection('blocked').doc('numbers').get();
+      if (blockedNumbersDoc.exists) {
+        final data = blockedNumbersDoc.data();
+        if (data != null && data.containsKey(phoneNumber)) {
+          return 'Blocked';
+        }
+      }
+
+      // If not in reports or blocked, it's rejected
+      return 'Rejected';
+    } catch (e) {
+      debugPrint("Error getting report status for $phoneNumber: $e");
+      return 'Unknown'; // Return unknown status on error
+    }
+  }
+
+  // Fetch user profile by device ID from 'requests_authentication' collection
   Future<Map<String, String>> getUserProfileByDeviceId(String deviceId) async {
     try {
       final docSnapshot = await _firestore.collection('requests_authentication').doc(deviceId).get();
@@ -97,14 +162,13 @@ class FirestoreService {
         final data = docSnapshot.data();
         if (data != null) {
           return {
-            'name': data['name'] as String? ?? 'Unknown User',
-            'email': data['email'] as String? ?? 'No Email',
-            'mobile': data['mobile'] as String? ?? 'No Phone',
-            'location': data['location'] as String? ?? 'Unknown Location', // Assuming 'location' might be added
-            // Add other fields if they are part of UserRequest and need to be displayed
+            'name': data['name'] as String? ?? '',
+            'mobile': data['mobile'] as String? ?? '',
+            // Remove location since it's not in your UserRequest model
           };
         }
       }
+      debugPrint("No profile found for device: $deviceId");
     } catch (e) {
       debugPrint("Error fetching user profile from Firestore: $e");
     }
@@ -118,7 +182,7 @@ class FirestoreService {
       debugPrint("User profile updated in Firestore for device: $deviceId");
     } catch (e) {
       debugPrint("Error updating user profile in Firestore: $e");
-      rethrow; // Rethrow to handle in UI if necessary
+      rethrow; // Rethrow to allow UI to handle the error
     }
   }
 }

@@ -1,14 +1,13 @@
+// user_request.dart
 class UserRequest {
   final String name;
-  final String email;
-  final String mobile;
+  final String mobile; // Removed email
   final String deviceId;
   final DateTime timestamp;
 
   UserRequest({
     required this.name,
-    required this.email,
-    required this.mobile,
+    required this.mobile, // Removed email
     required this.deviceId,
     required this.timestamp,
   });
@@ -17,9 +16,8 @@ class UserRequest {
   Map<String, dynamic> toJson() {
     return {
       'name': name,
-      //'email': email,
       'mobile': mobile,
-      'UUID': deviceId,
+      'deviceId': deviceId, // Use 'deviceId' directly, removed 'UUID'
       'createdAt': timestamp,
       'authenticated': false
     };
