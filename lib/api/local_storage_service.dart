@@ -1,9 +1,13 @@
+// local_storage_service.dart
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert'; // Import for JSON encoding/decoding
 
 class LocalAuthService {
   static const String _authStatusKey = 'isLoggedIn';
   static const String _userProfileKey = 'userProfile';
+
+  // NEW: Key for locally stored blocked numbers
+  static const String _blockedNumbersKey = 'blockedNumbers'; 
 
   // Check if the user is marked as logged in locally
   Future<bool> isUserLoggedInLocally() async {
@@ -23,6 +27,7 @@ class LocalAuthService {
     await prefs.remove(_authStatusKey);
     await prefs.remove(_userProfileKey); // Clear profile on logout
     await prefs.remove(LocalReportedNumbersStorage._reportedNumbersKey); // Clear reported numbers
+    await prefs.remove(_blockedNumbersKey); // NEW: Clear locally stored blocked numbers
   }
 
   // Save user profile data
@@ -38,7 +43,7 @@ class LocalAuthService {
     if (profileString != null) {
       return Map<String, String>.from(json.decode(profileString));
     }
-    return {}; // Return empty map if no profile is found
+    return {};
   }
 }
 
@@ -79,6 +84,7 @@ class LocalBlockedNumbersStorage {
     return _cache.contains(number);
   }
 }
+
 
 // New class for managing locally reported numbers
 class LocalReportedNumbersStorage {

@@ -1,7 +1,10 @@
+// request_access_screen.dart
 // Add this at the top of the file
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart'; // Import for FilteringTextInputFormatter
 import '../../api/device_auth_service.dart';
 import '../../models/user_request.dart';
+import '../../api/firestore_service.dart'; // NEW: Import FirestoreService
 
 class RequestAccessScreen extends StatefulWidget {
   // Add this parameter
@@ -14,12 +17,12 @@ class RequestAccessScreen extends StatefulWidget {
 }
 
 class _RequestAccessScreenState extends State<RequestAccessScreen> {
-  // ... (all your existing variables _formKey, controllers, etc. remain the same) ...
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
-  final _emailController = TextEditingController();
+  // Removed _emailController
   final _mobileController = TextEditingController();
-  final _authService = DeviceAuthService();
+  final DeviceAuthService _authService = DeviceAuthService();
+  final FirestoreService _firestoreService = FirestoreService(); // NEW: Instantiate FirestoreService
   bool _isLoading = false;
   bool _requestSent = false;
 
@@ -39,55 +42,84 @@ class _RequestAccessScreenState extends State<RequestAccessScreen> {
       });
     }
   }
-  
-  // ... The rest of your _submitRequest and build method can remain largely the same.
-  // I'm including the full build method for clarity.
-   Future<void> _submitRequest() async {
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    // Removed _emailController.dispose();
+    _mobileController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submitRequest() async {
     if (_formKey.currentState!.validate()) {
       setState(() {
         _isLoading = true;
       });
 
-      final deviceId = await _authService.getDeviceIdentifier();
-      if (deviceId == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Could not get device ID. Cannot request access.")),
-        );
-        setState(() {
-          _isLoading = false;
-        });
-        return;
-      }
+      final name = _nameController.text;
+      final mobile = '+91${_mobileController.text}'; // Auto-prefix +91
 
-      final request = UserRequest(
-        name: _nameController.text,
-        email: _emailController.text,
-        mobile: _mobileController.text,
-        deviceId: deviceId,
-        timestamp: DateTime.now(),
+      // Show confirmation dialog
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Confirm Request Details'),
+          content: Text('Name: $name\nMobile Number: $mobile\n\nPlease verify these details before submitting.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: const Text('Confirm'),
+            ),
+          ],
+        ),
       );
 
-      final success = await _authService.requestAccess(request);
+      if (confirmed == true) {
+        final deviceId = await _authService.getDeviceIdentifier();
+
+        if (deviceId != null) {
+          final userRequest = UserRequest(
+            name: name,
+            mobile: mobile,
+            deviceId: deviceId,
+            timestamp: DateTime.now(),
+          );
+
+          try {
+            // Use the FirestoreService to send the request
+            final success = await _firestoreService.sendLoginRequest(userRequest);
+            if (success) {
+              setState(() {
+                _requestSent = true;
+              });
+            } else {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Failed to submit request. Please try again.')),
+              );
+            }
+          } catch (e) {
+            debugPrint("Error submitting request to Firestore: $e");
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('An error occurred. Please try again.')),
+            );
+          }
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Could not retrieve device ID. Cannot submit request.')),
+          );
+        }
+      }
 
       setState(() {
         _isLoading = false;
-        if (success) {
-          _requestSent = true;
-        }
       });
-
-       if (success) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Request sent successfully! Please wait for approval.")),
-        );
-      } else {
-         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Failed to send request. Please try again.")),
-        );
-      }
     }
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -97,40 +129,44 @@ class _RequestAccessScreenState extends State<RequestAccessScreen> {
       ),
       body: Center(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24.0),
+          padding: const EdgeInsets.all(16.0),
           child: _requestSent
-              ? const Column(
+              ? Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.check_circle_outline, color: Colors.green, size: 80),
-                    SizedBox(height: 20),
+                    const Icon(Icons.check_circle_outline, color: Colors.green, size: 80),
+                    const SizedBox(height: 20),
                     Text(
-                      'Request Submitted',
-                      style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                      'Your access request has been submitted successfully!',
                       textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.headlineSmall,
                     ),
-                    SizedBox(height: 10),
+                    const SizedBox(height: 10),
                     Text(
-                      'Your access request has been sent. You will be logged in automatically once an administrator approves it. Please restart the app later.',
+                      'Please wait for administrator approval. You will be notified when your request is reviewed.',
                       textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: 16),
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
+                    const SizedBox(height: 20),
+                    // Modified success screen text
+                    Text(
+                      'In case of any errors in the submitted information, please contact the administrator.',
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.bodySmall,
                     ),
                   ],
                 )
               : Form(
                   key: _formKey,
                   child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                       Text(
-                        'Device Not Recognized',
-                        style: Theme.of(context).textTheme.titleLarge?.copyWith(fontSize: 24),
-                      ),
-                      const SizedBox(height: 8),
                       Text(
-                        'Please fill out the form below to request access.',
-                        style: Theme.of(context).textTheme.bodyMedium,
+                        'Request Access',
                         textAlign: TextAlign.center,
+                        style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                              fontWeight: FontWeight.bold,
+                            ),
                       ),
                       const SizedBox(height: 30),
                       TextFormField(
@@ -139,18 +175,28 @@ class _RequestAccessScreenState extends State<RequestAccessScreen> {
                         validator: (value) => value!.isEmpty ? 'Please enter your name' : null,
                       ),
                       const SizedBox(height: 20),
-                      TextFormField(
-                        controller: _emailController,
-                        decoration: const InputDecoration(labelText: 'Email Address', border: OutlineInputBorder()),
-                        keyboardType: TextInputType.emailAddress,
-                        validator: (value) => value!.isEmpty ? 'Please enter your email' : null,
-                      ),
-                      const SizedBox(height: 20),
+                      // Removed Email Field
                       TextFormField(
                         controller: _mobileController,
-                        decoration: const InputDecoration(labelText: 'Mobile Number', border: OutlineInputBorder()),
+                        decoration: const InputDecoration(
+                          labelText: 'Mobile Number',
+                          border: OutlineInputBorder(),
+                          prefixText: '+91 ', // Visual prefix
+                        ),
                         keyboardType: TextInputType.phone,
-                        validator: (value) => value!.isEmpty ? 'Please enter your mobile number' : null,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly, // Only allow digits
+                          LengthLimitingTextInputFormatter(10), // Limit to 10 digits
+                        ],
+                        validator: (value) {
+                          if (value!.isEmpty) {
+                            return 'Please enter your mobile number';
+                          }
+                          if (value.length != 10) {
+                            return 'Mobile number must be exactly 10 digits';
+                          }
+                          return null;
+                        },
                       ),
                       const SizedBox(height: 30),
                       _isLoading

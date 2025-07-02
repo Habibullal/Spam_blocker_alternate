@@ -235,7 +235,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       );
 
                       debugPrint('Attempting to report to Firestore...');
-                      await _firestoreService.reportNumber(report, number);
+                      await _firestoreService.submitReport(report);
                       debugPrint('Reported to Firestore successfully.');
 
                       debugPrint('Attempting to add to local storage using toLocalJson()...');

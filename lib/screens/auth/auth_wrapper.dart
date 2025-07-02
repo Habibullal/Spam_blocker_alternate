@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:spam_blocker/api/permissions.dart';
 import '../../api/device_auth_service.dart';
 import '../../api/local_storage_service.dart';
+import '../../api/firestore_service.dart'; // ADD THIS IMPORT
 import '../main/main_screen_container.dart';
 import 'request_access_screen.dart';
 import 'splash_screen.dart';
@@ -16,6 +17,7 @@ class AuthWrapper extends StatefulWidget {
 class _AuthWrapperState extends State<AuthWrapper> {
   final LocalAuthService _localAuth = LocalAuthService();
   final DeviceAuthService _deviceAuth = DeviceAuthService();
+  final FirestoreService _firestoreService = FirestoreService(); // ADD THIS
 
   late Future<bool> _isLoggedInLocally, permissionGranted;
 
@@ -54,6 +56,22 @@ class _AuthWrapperState extends State<AuthWrapper> {
     }
   }
 
+  // NEW: Function to fetch and save user profile from Firestore
+  Future<void> _fetchAndSaveUserProfile() async {
+    try {
+      final deviceId = await _deviceAuth.getDeviceIdentifier();
+      if (deviceId != null) {
+        final profile = await _firestoreService.getUserProfileByDeviceId(deviceId);
+        if (profile.isNotEmpty) {
+          await _localAuth.saveUserProfile(profile);
+          debugPrint("User profile fetched and saved locally");
+        }
+      }
+    } catch (e) {
+      debugPrint("Error fetching user profile: $e");
+    }
+  }
+
   // This function performs the background check and handles navigation if access is revoked
   void _validateOnlineAndNavigate() {
     _deviceAuth.isDeviceRegistered().then((isStillRegistered) {
@@ -64,7 +82,8 @@ class _AuthWrapperState extends State<AuthWrapper> {
           (route) => false,
         ); 
       }
-      // If still registered, do nothing. The user is already in the app.
+      // If still registered, fetch and update profile
+      _fetchAndSaveUserProfile(); // ADD THIS LINE
     }).catchError((_) {
       // Silently fail if offline. The user can continue using the app.
       debugPrint("Background validation failed. User is likely offline.");
@@ -98,7 +117,8 @@ class _AuthWrapperState extends State<AuthWrapper> {
                 return const SplashScreen();
               }
               if (onlineSnapshot.data == true) {
-                // Device is authorized online, let them in
+                // Device is authorized online, fetch profile and let them in
+                _fetchAndSaveUserProfile(); // ADD THIS LINE
                 return const MainScreenContainer();
               } else {
                 // Device is not authorized, show the request form
