@@ -4,6 +4,7 @@ import '../../api/device_auth_service.dart';
 import '../../notifiers/theme_notifier.dart';
 import '../auth/auth_wrapper.dart';
 import '../../api/local_storage_service.dart'; // Import the local storage service
+import '../../api/firestore_service.dart'; // NEW: Import FirestoreService
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -18,6 +19,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   String _userEmail = '';
   String _userPhone = '';
   String _userLocation = '';
+  String _deviceId = 'Loading...'; // NEW: To store and display device ID
   String _profileImageUrl = ''; // Keep this if you plan to use it
 
   final TextEditingController _nameController = TextEditingController();
@@ -26,6 +28,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   final TextEditingController _locationController = TextEditingController();
 
   final LocalAuthService _localAuthService = LocalAuthService();
+  final DeviceAuthService _deviceAuthService = DeviceAuthService(); // NEW: Instantiate DeviceAuthService
+  final FirestoreService _firestoreService = FirestoreService(); // NEW: Instantiate FirestoreService
 
   @override
   void initState() {
@@ -34,18 +38,45 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _loadUserProfile() async {
-    final profile = await _localAuthService.getUserProfile();
-    setState(() {
-      _userName = profile['name'] ?? 'Unknown User';
-      _userEmail = profile['email'] ?? 'No Email';
-      _userPhone = profile['mobile'] ?? 'No Phone'; // Use 'mobile' key from UserRequest
-      _userLocation = profile['location'] ?? 'Unknown Location';
+    // Fetch device ID first
+    final String? fetchedDeviceId = await _deviceAuthService.getDeviceIdentifier();
+    if (fetchedDeviceId != null) {
+      setState(() {
+        _deviceId = fetchedDeviceId;
+      });
 
-      _nameController.text = _userName;
-      _emailController.text = _userEmail;
-      _phoneController.text = _userPhone;
-      _locationController.text = _userLocation;
-    });
+      // Fetch user profile from Firestore using the device ID
+      final Map<String, String> firestoreProfile =
+          await _firestoreService.getUserProfileByDeviceId(fetchedDeviceId);
+
+      // Fetch user profile from local storage (for fallback or previously saved data)
+      final Map<String, String> localProfile = await _localAuthService.getUserProfile();
+
+      setState(() {
+        // Prioritize Firestore data, fallback to local storage, then default values
+        _userName = firestoreProfile['name'] ?? localProfile['name'] ?? 'Unknown User';
+        _userEmail = firestoreProfile['email'] ?? localProfile['email'] ?? 'No Email';
+        _userPhone = firestoreProfile['mobile'] ?? localProfile['mobile'] ?? 'No Phone';
+        _userLocation = firestoreProfile['location'] ?? localProfile['location'] ?? 'Unknown Location';
+
+        _nameController.text = _userName;
+        _emailController.text = _userEmail;
+        _phoneController.text = _userPhone;
+        _locationController.text = _userLocation;
+      });
+      // Save the fetched Firestore profile to local storage for future quick access
+      await _localAuthService.saveUserProfile({
+        'name': _userName,
+        'email': _userEmail,
+        'mobile': _userPhone,
+        'location': _userLocation,
+      });
+    } else {
+      // Handle case where device ID cannot be obtained
+      setState(() {
+        _deviceId = 'Device ID Not Available';
+      });
+    }
   }
 
   @override
@@ -101,20 +132,46 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   _userPhone = _phoneController.text;
                   _userLocation = _locationController.text;
                 });
-                // Save updated profile to local storage
-                await _localAuthService.saveUserProfile({
+
+                // Prepare data for Firestore and local storage
+                final Map<String, dynamic> updatedData = {
                   'name': _userName,
                   'email': _userEmail,
                   'mobile': _userPhone, // Save as 'mobile' to match UserRequest
                   'location': _userLocation,
-                });
+                };
+
+                // Save updated profile to local storage
+                await _localAuthService.saveUserProfile(Map<String, String>.from(updatedData));
+
+                // Save updated profile to Firestore
+                if (_deviceId != 'Loading...' && _deviceId != 'Device ID Not Available') {
+                  try {
+                    await _firestoreService.updateUserProfile(_deviceId, updatedData);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: const Text('Profile updated successfully!'),
+                        backgroundColor: Theme.of(context).colorScheme.primary,
+                      ),
+                    );
+                  } catch (e) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Failed to update profile in Firestore: $e'),
+                        backgroundColor: Theme.of(context).colorScheme.error,
+                      ),
+                    );
+                  }
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: const Text('Cannot save profile: Device ID not available.'),
+                      backgroundColor: Theme.of(context).colorScheme.error,
+                    ),
+                  );
+                }
+
                 Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: const Text('Profile updated successfully!'),
-                    backgroundColor: Theme.of(context).colorScheme.primary,
-                  ),
-                );
               },
               child: const Text('Save'),
             ),
@@ -205,6 +262,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     _buildDetailRow(Icons.phone, 'Phone Number', _userPhone),
                     const Divider(height: 24),
                     _buildDetailRow(Icons.location_on, 'Location', _userLocation),
+                    const Divider(height: 24), // NEW: Divider for Device ID
+                    _buildDetailRow(Icons.devices, 'Device ID', _deviceId), // NEW: Display Device ID
                   ],
                 ),
               ),

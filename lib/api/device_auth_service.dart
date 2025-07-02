@@ -3,6 +3,7 @@ import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/foundation.dart';
 import 'package:spam_blocker/api/firestore_service.dart';
 import '../models/user_request.dart';
+import 'package:android_id/android_id.dart';
 import 'local_storage_service.dart'; // <-- IMPORT THE NEW SERVICE
 
 class DeviceAuthService {
@@ -15,8 +16,8 @@ class DeviceAuthService {
     try {
       if (kIsWeb) return null;
       if (Platform.isAndroid) {
-        final androidInfo = await _deviceInfo.androidInfo;
-        return androidInfo.id;
+        final id = await const AndroidId().getId();
+        return id;
       } else if (Platform.isIOS) {
         final iosInfo = await _deviceInfo.iosInfo;
         return iosInfo.identifierForVendor;
