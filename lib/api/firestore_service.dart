@@ -23,7 +23,7 @@ class FirestoreService {
       dynamic isRegistered = doc.exists && doc.data()?['authenticated'] == true;
       return isRegistered;
     } catch (e) {
-      debugPrint("Error checking device in DB: $e");
+      debugPrint("Error `checking device in DB: $e");
       return false; // Return false on error
     }
   }

@@ -16,7 +16,7 @@ class BlockerService : CallScreeningService() {
       val incoming = callDetails.handle.schemeSpecificPart
       Log.d("in", "call coming in")
       val builder = CallResponse.Builder()
-      getNumber.checkNumber(this,incoming) { isValid ->
+      Utils.checkNumber(this,incoming) { isValid ->
         Log.d("e", isValid.toString())
         if (isValid) {
           Log.d("blocker", "hello")

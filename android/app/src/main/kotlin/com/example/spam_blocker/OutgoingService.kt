@@ -12,7 +12,7 @@ class OutgoingService : CallRedirectionService() {
         allowInteractiveResponse: Boolean
     ) {
         val number = handle.schemeSpecificPart
-        getNumber.checkNumber(this, number) { isValid ->
+        Utils.checkNumber(this, number) { isValid ->
             Log.d("e", isValid.toString())
             if (isValid) {
                 Log.d("outgoing", "Call blocked")

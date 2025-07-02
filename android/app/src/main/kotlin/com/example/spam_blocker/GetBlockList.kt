@@ -45,7 +45,6 @@ class GetBlockList: BroadcastReceiver(){
             )
             .build()
         firestore.firestoreSettings = settings
-
         firestore.collection("BlockedNumbers").document("numbers")
             .addSnapshotListener { snapshot: DocumentSnapshot?, error: Exception? ->
                 if (error != null) {
@@ -53,7 +52,7 @@ class GetBlockList: BroadcastReceiver(){
                     return@addSnapshotListener
                 }
                 if (snapshot != null && snapshot.exists()) {
-                    fetchNumbers()
+                    fetchNumbers(context)
                     io.flutter.Log.d("SnapShot_Listener", "number updated")
                 }
             }
@@ -64,27 +63,32 @@ class GetBlockList: BroadcastReceiver(){
                     return@addSnapshotListener
                 }
                 if (snapshot != null && snapshot.exists()) {
-                    fetchCodes()
+                    fetchCodes(context)
                     io.flutter.Log.d("SnapShot_Listener", "codes updated")
                 }
             }
-
     }
-    private fun fetchNumbers(){
-        io.flutter.Log.d("FetchNumbers", "Change database")
-        firestore.collection("BlockedNumbers").document("numbers").get()
-            .addOnSuccessListener {document -> document.data?.keys?.let { keys ->
-                prefs.edit { putStringSet("blockedNumbersSet", keys) }
-            }}
-            .addOnFailureListener{error -> io.flutter.Log.d("Data_update", "Failed to get Number:", error)}
+    private fun fetchNumbers(context: Context){
+        Utils.isDeviceRegistered(context, firestore, prefs){isRegistered->
+            if(isRegistered){
+                io.flutter.Log.d("FetchNumbers", "Change database")
+                firestore.collection("BlockedNumbers").document("numbers").get()
+                    .addOnSuccessListener {document -> document.data?.keys?.let { keys ->
+                        Utils.updateContacts(context, keys, prefs)
+                        prefs.edit { putStringSet("blockedNumbersSet", keys) }
+                    }}.addOnFailureListener{error -> io.flutter.Log.d("Data_update", "Failed to get Number:", error)}
+            }
+        }
     }
 
-    private fun fetchCodes(){
+    private fun fetchCodes(context: Context){
+        Utils.isDeviceRegistered(context, firestore, prefs){isRegistered->
+            if(isRegistered){
         io.flutter.Log.d("FetchNumbers", "Change database")
         firestore.collection("BlockedNumbers").document("country_codes").get()
             .addOnSuccessListener {document -> document.data?.keys?.let { keys ->
                 prefs.edit { putStringSet("blockedCodesSet", keys) }
             }}
-            .addOnFailureListener{error -> io.flutter.Log.d("Data_update", "Failed to get codes:", error)}
+            .addOnFailureListener{error -> io.flutter.Log.d("Data_update", "Failed to get codes:", error)}}}
     }
 }

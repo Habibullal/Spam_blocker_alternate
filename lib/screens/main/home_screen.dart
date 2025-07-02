@@ -109,6 +109,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _requestAndFetchCallLogs() async {
     try {
+      await _platform.invokeMethod("requestContactPermission");
       final bool? granted = await _platform.invokeMethod('requestCallLogPermission');
       if (granted == true) {
         _fetchCallLogs();
