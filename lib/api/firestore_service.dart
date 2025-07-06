@@ -138,7 +138,7 @@ class FirestoreService {
       }
 
       // Check if the number is in the 'blocked/numbers' document
-      final blockedNumbersDoc = await _firestore.collection('blocked').doc('numbers').get();
+      final blockedNumbersDoc = await _firestore.collection('BlockedNumbers').doc('numbers').get();
       if (blockedNumbersDoc.exists) {
         final data = blockedNumbersDoc.data();
         if (data != null && data.containsKey(phoneNumber)) {

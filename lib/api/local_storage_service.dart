@@ -47,45 +47,6 @@ class LocalAuthService {
   }
 }
 
-class LocalBlockedNumbersStorage {
-  static const _authStatusKey = 'blockedNumbers';
-  LocalBlockedNumbersStorage._();
-  static final instance = LocalBlockedNumbersStorage._();
-  Set<String> _cache = {};
-
-  Future<Set<String>> getNumbers() async {
-    if (_cache.isNotEmpty) {
-      return _cache;
-    }
-    final prefs = await SharedPreferences.getInstance();
-    final list = prefs.getString(_authStatusKey) ?? "";
-    print("Cost");
-
-    _cache = list.split("|").toSet();
-    return _cache;
-  }
-
-  Future<void> updateNumbers() async {
-    final prefs = await SharedPreferences.getInstance();
-    prefs.setString(_authStatusKey, _cache.join("|"));
-  }
-
-  void addNumbers(String number) {
-    _cache.add(number);
-    updateNumbers();
-  }
-
-  void createNumber(String number) {
-    _cache.add(number);
-    updateNumbers();
-  }
-
-  bool numberPresent(String number) {
-    return _cache.contains(number);
-  }
-}
-
-
 // New class for managing locally reported numbers
 class LocalReportedNumbersStorage {
   static const String _reportedNumbersKey = 'reportedNumbers';

@@ -43,7 +43,7 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   static const _platform = MethodChannel('com.example.spam_blocker/channel');
-  Set<String> _blockedNumbers = {};
+  //Set<String> _blockedNumbers = {};
   List<CallLogEntry> _callLogs = []; // List to hold call log entries
   Set<String> _reportedNumbersLocally = {}; // To track locally reported numbers
   bool _isLoading = false;
@@ -59,7 +59,7 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _platform.setMethodCallHandler(_handleNumberFetch); // Keep existing handler
-    _loadBlockedNumbers();
+    //_loadBlockedNumbers();
     _loadReportedNumbersLocally(); // Load locally reported numbers
     _requestAndFetchCallLogs(); // New: Request permission and fetch call logs
   }
@@ -69,15 +69,6 @@ class _HomeScreenState extends State<HomeScreen> {
     _reportedNumberController.dispose();
     _reportReasonController.dispose();
     super.dispose();
-  }
-
-  Future<void> _loadBlockedNumbers() async {
-    setState(() => _isLoading = true);
-    final numbers = await LocalBlockedNumbersStorage.instance.getNumbers();
-    setState(() {
-      _blockedNumbers = numbers;
-      _isLoading = false;
-    });
   }
 
   // New: Load locally reported numbers
@@ -96,14 +87,6 @@ class _HomeScreenState extends State<HomeScreen> {
       } else {
         _showPermissionDeniedDialog('Call Log');
       }
-    }
-    switch (call.method) {
-      case "checkNumber":
-        final String num = call.arguments['text'] as String;
-        print("number checked");
-        return LocalBlockedNumbersStorage.instance.numberPresent(num);
-      default:
-        return null;
     }
   }
 
