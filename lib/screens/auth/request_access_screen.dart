@@ -65,6 +65,9 @@ class _RequestAccessScreenState extends State<RequestAccessScreen> {
         final granted = call.arguments as bool;
         if (granted) {
           await _loadSimInfo();
+          setState(() {
+            _simPermDone = true;
+          });
         } else {
           setState(() {
             _loading = false;
@@ -267,7 +270,8 @@ class _RequestAccessScreenState extends State<RequestAccessScreen> {
                         border: OutlineInputBorder(),
                       ),
                       items: _sims.map((sim) {
-                        final num = sim['number'] as String;
+                        final fullnum = sim['number'] as String;
+                        final num = fullnum.length <= 10 ? fullnum : fullnum.substring(fullnum.length -10);
                         return DropdownMenuItem(value: num, child: Text(num));
                       }).toList(),
                       value: _selectedNumber,
