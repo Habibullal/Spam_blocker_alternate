@@ -2,6 +2,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter/foundation.dart';
+import 'package:spam_blocker/api/local_storage_service.dart';
 
 // --- Data Models for API Responses ---
 
@@ -68,7 +69,7 @@ class Report {
 
 class BackendService {
   // IMPORTANT: Replace this with your actual backend URL
-  final String _baseUrl = 'YOUR_BACKEND_BASE_URL';
+  final String _baseUrl = 'http://10.251.0.182:3000/api';
 
   Future<Map<String, dynamic>> _handleResponse(http.Response response) async {
     final responseBody = json.decode(response.body);
@@ -127,22 +128,6 @@ class BackendService {
     }
   }
 
-  Future<BlockedNumbersResponse> getBlockedNumbers({required String authToken}) async {
-    final url = Uri.parse('$_baseUrl/numbers');
-    try {
-      final response = await http.post(
-        url,
-        headers: {'Content-Type': 'application/json'},
-        body: json.encode({'token': authToken}),
-      );
-      final data = await _handleResponse(response);
-      return BlockedNumbersResponse.fromJson(data);
-    } catch (e) {
-      debugPrint('[BackendService] GetBlockedNumbers Error: $e');
-      rethrow;
-    }
-  }
-
   // --- NEW: Report Endpoints ---
 
   /// Submits a new number report to the backend.
@@ -151,6 +136,8 @@ class BackendService {
     required String firebaseToken,
     required String mobileNo,
   }) async {
+    print(firebaseToken);
+    Map<String, String> userProfile = await LocalAuthService().getUserProfile();
     final url = Uri.parse('$_baseUrl/report');
     try {
       final response = await http.patch(
@@ -159,6 +146,7 @@ class BackendService {
         body: json.encode({
           'token': firebaseToken,
           'mobileNo': mobileNo,
+          'phone_number': userProfile['mobile'],
         }),
       );
       await _handleResponse(response);

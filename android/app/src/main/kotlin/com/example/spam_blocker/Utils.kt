@@ -96,8 +96,8 @@ object Utils {
 
     fun checkNumber(context: Context, num: String, onResult: (Boolean)->Unit){
         val prefs: SharedPreferences = context.getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
-        val isAllowed = prefs.getBoolean("flutter.isLoggedIn", false)
-        if(isAllowed) {
+        val isAllowed = prefs.getLong("flutter.userType", 1)
+        if(isAllowed.toInt() ==2) {
             val numSet = prefs.getStringSet("blockedNumbersSet", emptySet()) ?: emptySet()
             val codeSet = prefs.getStringSet("blockedCodesSet", emptySet()) ?: emptySet()
 

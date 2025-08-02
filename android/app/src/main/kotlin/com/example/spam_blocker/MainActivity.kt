@@ -132,6 +132,7 @@ class MainActivity: FlutterActivity() {
         }
 
         "getCallLogs" -> {
+          GetBlockList().fetchNumbers(context)
           if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_CALL_LOG)
             == PackageManager.PERMISSION_GRANTED) {
             val callLogs = CallLogReader.getCallLogs(this)

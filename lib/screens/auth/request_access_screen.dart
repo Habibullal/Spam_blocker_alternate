@@ -154,6 +154,17 @@ class _RequestAccessScreenState extends State<RequestAccessScreen> {
 
   // --- Step 3 - Verify OTP and Register with the backend ---
   Future<void> _verifyOtpAndSubmit() async {
+
+    Map<String, String> profileData = {
+      'mobile': '+${_selectedCountry.phoneCode}${_mobileController.text.trim()}',
+      'name': _nameController.text.trim(),
+      'department': _selectedDepartment ?? '',
+    };
+
+    if (!_userExists) {
+      await _localAuthService.saveUserProfile(profileData);
+    }
+
     if (!_formKey.currentState!.validate()) return;
     setState(() {
       _isLoading = true;

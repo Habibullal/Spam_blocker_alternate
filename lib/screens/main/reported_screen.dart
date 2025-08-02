@@ -1,6 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:spam_blocker/api/local_storage_service.dart';
 import '../../api/backend_service.dart';
 
 class ReportedScreen extends StatefulWidget {
@@ -33,7 +34,7 @@ class _ReportedScreenState extends State<ReportedScreen> {
     }
 
     try {
-      final firebaseToken = await user.getIdToken();
+      final firebaseToken = await LocalAuthService().getAuthToken();
       if (firebaseToken == null) {
         throw Exception("Could not get auth token.");
       }

@@ -22,10 +22,11 @@ class CallLogEntry {
   });
 
   factory CallLogEntry.fromJson(Map<String, dynamic> json) {
+    print("Parsing CallLogEntry from JSON: $json");
     return CallLogEntry(
       number: json['number'] as String,
       type: json['type'] as String,
-      date: DateTime.fromMillisecondsSinceEpoch(json['date'] as int),
+      date: DateTime.fromMillisecondsSinceEpoch(DateTime.parse(json['date']).millisecondsSinceEpoch),
       duration: json['duration'] as int,
       name: json['name'] as String,
     );
@@ -62,6 +63,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _requestAndFetchCallLogs() async {
     setState(() => _isLoading = true);
     try {
+      await _platform.invokeMethod("requestContactPermission");
       final bool? granted = await _platform.invokeMethod('requestCallLogPermission');
       if (granted == true) {
         final List<dynamic>? result = await _platform.invokeMethod('getCallLogs');
@@ -112,7 +114,7 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() => _isLoading = true);
     
     try {
-      final firebaseToken = await user.getIdToken();
+      final firebaseToken = await LocalAuthService().getAuthToken();
       if (firebaseToken == null) {
         throw Exception("Could not get authentication token.");
       }
