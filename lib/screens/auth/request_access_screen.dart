@@ -2,11 +2,11 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:http/http.dart' as http;
 import 'package:country_picker/country_picker.dart';
 
-import '../../api/device_auth_service.dart';
 import '../../api/backend_service.dart';
+import '../../api/local_storage_service.dart';
+import '../main/main_screen_container.dart'; // Import for navigation
 
 // Enum to manage the current step of the UI
 enum AuthStep {
@@ -19,8 +19,13 @@ enum AuthStep {
 
 class RequestAccessScreen extends StatefulWidget {
   final bool wasKickedOut;
+  final bool showPendingMessage;
 
-  const RequestAccessScreen({super.key, this.wasKickedOut = false});
+  const RequestAccessScreen({
+    super.key,
+    this.wasKickedOut = false,
+    this.showPendingMessage = false,
+  });
 
   @override
   State<RequestAccessScreen> createState() => _RequestAccessScreenState();
@@ -32,9 +37,8 @@ class _RequestAccessScreenState extends State<RequestAccessScreen> {
   final _mobileController = TextEditingController();
   final _otpController = TextEditingController();
 
-  final DeviceAuthService _authService = DeviceAuthService();
-  // NEW: Use the new BackendService instead of FirestoreService
   final BackendService _backendService = BackendService();
+  final LocalAuthService _localAuthService = LocalAuthService();
 
   // State management variables
   AuthStep _currentStep = AuthStep.enterNumber;
@@ -48,7 +52,6 @@ class _RequestAccessScreenState extends State<RequestAccessScreen> {
   List<String> _departments = [];
   String? _selectedDepartment;
 
-  // Country picker state
   Country _selectedCountry = Country(
     phoneCode: '91',
     countryCode: 'IN',
@@ -67,13 +70,11 @@ class _RequestAccessScreenState extends State<RequestAccessScreen> {
     super.initState();
     if (widget.wasKickedOut) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Your device access has been revoked.'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        _showErrorSnackbar('Your device access has been revoked.');
       });
+    }
+    if (widget.showPendingMessage) {
+      _requestSent = true;
     }
   }
 
@@ -87,50 +88,23 @@ class _RequestAccessScreenState extends State<RequestAccessScreen> {
 
   // --- Step 1 - Verify if the mobile number exists ---
   Future<void> _checkNumberExists() async {
-    if (!_formKey.currentState!.validate()) {
-      return;
-    }
-
+    if (!_formKey.currentState!.validate()) return;
     setState(() {
       _isLoading = true;
       _currentStep = AuthStep.verifyingNumber;
     });
 
     try {
-      final url = Uri.parse('enter your /check url here'); // Use your actual backend URL for /check
-      final response = await http.post(
-        url,
-        headers: {'Content-Type': 'application/json'},
-        body: json.encode({'mobileNo': _mobileController.text.trim()}),
-      );
-
-      if (response.statusCode == 200) {
-        final responseData = json.decode(response.body);
-        final userExists = responseData['exists'] == 1;
-
-        setState(() {
-          _userExists = userExists;
-          if (!userExists) {
-            final List<dynamic> departmentData = responseData['departments'];
-            _departments = departmentData.map((d) => d.toString()).toList();
-          }
-          _currentStep = AuthStep.enterDetailsAndSendOtp;
-        });
-      } else if (response.statusCode == 403) {
-        _showErrorSnackbar('Mobile number not allowed');
-        setState(() {
-          _currentStep = AuthStep.enterNumber;
-        });
-      } else {
-        final errorData = json.decode(response.body);
-        _showErrorSnackbar(errorData['message'] ?? 'An unknown error occurred.');
-        setState(() {
-          _currentStep = AuthStep.enterNumber;
-        });
-      }
+      final response = await _backendService.checkNumberExists(_mobileController.text.trim());
+      setState(() {
+        _userExists = response.exists;
+        if (!response.exists) {
+          _departments = response.departments;
+        }
+        _currentStep = AuthStep.enterDetailsAndSendOtp;
+      });
     } catch (e) {
-      debugPrint("Error checking number: $e");
-      _showErrorSnackbar('Could not connect to the server. Please try again.');
+      _showErrorSnackbar(e.toString());
       setState(() {
         _currentStep = AuthStep.enterNumber;
       });
@@ -143,12 +117,8 @@ class _RequestAccessScreenState extends State<RequestAccessScreen> {
 
   // --- Step 2 - Send OTP ---
   Future<void> _sendOtp() async {
-    if (!_formKey.currentState!.validate()) {
-      return;
-    }
-    setState(() {
-      _isLoading = true;
-    });
+    if (!_formKey.currentState!.validate()) return;
+    setState(() { _isLoading = true; });
 
     final mobileNumber = '+${_selectedCountry.phoneCode}${_mobileController.text.trim()}';
 
@@ -162,7 +132,6 @@ class _RequestAccessScreenState extends State<RequestAccessScreen> {
         await _verifyOtpAndSubmit();
       },
       verificationFailed: (FirebaseAuthException e) {
-        debugPrint('Verification Failed: ${e.message}');
         _showErrorSnackbar('Verification failed: ${e.message}');
         setState(() { _isLoading = false; });
       },
@@ -170,7 +139,7 @@ class _RequestAccessScreenState extends State<RequestAccessScreen> {
         setState(() {
           _verificationId = verificationId;
           _resendToken = resendToken;
-          _currentStep = AuthStep.otpSent; // Move to next step
+          _currentStep = AuthStep.otpSent;
           _isLoading = false;
         });
         ScaffoldMessenger.of(context).showSnackBar(
@@ -185,149 +154,123 @@ class _RequestAccessScreenState extends State<RequestAccessScreen> {
 
   // --- Step 3 - Verify OTP and Register with the backend ---
   Future<void> _verifyOtpAndSubmit() async {
-    if (!_formKey.currentState!.validate()) {
-      return;
-    }
-
+    if (!_formKey.currentState!.validate()) return;
     setState(() {
       _isLoading = true;
       _currentStep = AuthStep.submitting;
     });
 
     try {
-      final PhoneAuthCredential credential = PhoneAuthProvider.credential(
+      final credential = PhoneAuthProvider.credential(
         verificationId: _verificationId!,
         smsCode: _otpController.text.trim(),
       );
-
-      // Sign in to confirm the user owns the number
       await FirebaseAuth.instance.signInWithCredential(credential);
-      // If successful, proceed to register on your own server
       await _registerUserOnServer();
     } on FirebaseAuthException catch (e) {
-      debugPrint('OTP Verification Failed: ${e.message}');
       _showErrorSnackbar('OTP verification failed: ${e.message}');
-      // Revert step to allow re-entry of OTP
       setState(() { _currentStep = AuthStep.otpSent; });
+    } finally {
+      if(mounted) {
+        setState(() { _isLoading = false; });
+      }
     }
-    // The finally block is removed as loading state is handled in _registerUserOnServer
   }
 
-   // --- Final Step - Submit data to your backend server ---
+  // --- Final Step - Submit data to your backend server ---
   Future<void> _registerUserOnServer() async {
-    final name = _nameController.text.trim();
-    final mobile = '+${_selectedCountry.phoneCode}${_mobileController.text.trim()}';
-    final deviceId = await _authService.getDeviceIdentifier();
-    final department = _userExists ? null : _selectedDepartment; // Use null if user exists
-
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
-      _showErrorSnackbar('User not authenticated with Firebase.');
-      setState(() { _currentStep = AuthStep.otpSent; });
+      _showErrorSnackbar('User not authenticated. Please restart.');
+      setState(() { _currentStep = AuthStep.enterNumber; });
       return;
     }
 
-    // Await the token. Note that the return type is 'String?'.
-    final String? token = await user.getIdToken();
-
-    // FIX: Check if the token is null before proceeding.
-    if (token == null) {
+    final firebaseToken = await user.getIdToken();
+    if (firebaseToken == null) {
       _showErrorSnackbar('Failed to get authentication token. Please try again.');
       setState(() { _currentStep = AuthStep.otpSent; });
       return;
     }
 
-    // Now that we've checked for null, we can safely use the non-nullable token variable.
-    final requestBody = RegisterRequest(
-      token: token,
-      username: _userExists ? null : name,
-      department: department,
-    );
-
-    setState(() {
-      _isLoading = true;
-    });
-
     try {
-      final success = await _backendService.registerUser(requestBody);
+      final response = await _backendService.registerOrCheckUser(
+        firebaseToken: firebaseToken,
+        username: _userExists ? null : _nameController.text.trim(),
+        department: _userExists ? null : _selectedDepartment,
+      );
 
-      if (success) {
+      // Save token and user type to local storage
+      await _localAuthService.saveAuthToken(response.token);
+      await _localAuthService.saveUserType(response.userType);
+      
+      // NEW: Handle navigation based on userType
+      if (response.userType == 2) {
+        // Approved user, go directly to the app
+        if (mounted) {
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(builder: (_) => const MainScreenContainer()),
+            (route) => false,
+          );
+        }
+      } else {
+        // Pending user, show the success/pending message
         setState(() {
           _requestSent = true;
         });
-      } else {
-        _showErrorSnackbar('Failed to submit request. Please try again.');
-        setState(() { _currentStep = AuthStep.otpSent; });
       }
     } catch (e) {
-      debugPrint("Error registering user: $e");
       _showErrorSnackbar(e.toString());
       setState(() { _currentStep = AuthStep.otpSent; });
-    } finally {
-      setState(() {
-        _isLoading = false;
-      });
     }
   }
+
+  // --- UI Helper Methods ---
 
   void _showErrorSnackbar(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: Colors.red),
-    );
-  }
-
-  // --- Helper function to determine the main button's action ---
-  VoidCallback? _getButtonAction() {
-    if (_isLoading) return null;
-
-    switch (_currentStep) {
-      case AuthStep.enterNumber:
-        return _checkNumberExists;
-      case AuthStep.enterDetailsAndSendOtp:
-        return _sendOtp;
-      case AuthStep.otpSent:
-        return _verifyOtpAndSubmit;
-      default:
-        return null; // Button is disabled during async operations
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message), backgroundColor: Colors.red),
+      );
     }
   }
 
-  // --- Helper function to determine the main button's text ---
+  VoidCallback? _getButtonAction() {
+    if (_isLoading) return null;
+    switch (_currentStep) {
+      case AuthStep.enterNumber: return _checkNumberExists;
+      case AuthStep.enterDetailsAndSendOtp: return _sendOtp;
+      case AuthStep.otpSent: return _verifyOtpAndSubmit;
+      default: return null;
+    }
+  }
+
   String _getButtonText() {
     switch (_currentStep) {
-      case AuthStep.enterNumber:
-        return 'Verify Number';
-      case AuthStep.verifyingNumber:
-        return 'Verifying...';
-      case AuthStep.enterDetailsAndSendOtp:
-        return 'Send OTP';
-      case AuthStep.otpSent:
-        return 'Verify & Submit';
-      case AuthStep.submitting:
-        return 'Submitting...';
+      case AuthStep.enterNumber: return 'Verify Number';
+      case AuthStep.verifyingNumber: return 'Verifying...';
+      case AuthStep.enterDetailsAndSendOtp: return 'Send OTP';
+      case AuthStep.otpSent: return 'Verify & Submit';
+      case AuthStep.submitting: return 'Submitting...';
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Request Access'),
-      ),
+      appBar: AppBar(title: const Text('Request Access')),
       body: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(16.0),
-          child: _requestSent
-              ? _buildSuccessWidget()
-              : _buildFormWidget(),
+          child: _requestSent ? _buildSuccessWidget() : _buildFormWidget(),
         ),
       ),
     );
   }
 
-  // --- WIDGET BUILDERS ---
-
   Widget _buildFormWidget() {
+    // This widget's code is long and has no logic changes, so it's omitted for brevity.
+    // The existing implementation is correct.
     return Form(
       key: _formKey,
       child: Column(
@@ -341,8 +284,6 @@ class _RequestAccessScreenState extends State<RequestAccessScreen> {
                 ),
           ),
           const SizedBox(height: 30),
-
-          // --- Mobile Number Field (with Country Picker) ---
           TextFormField(
             controller: _mobileController,
             readOnly: _currentStep != AuthStep.enterNumber,
@@ -391,9 +332,7 @@ class _RequestAccessScreenState extends State<RequestAccessScreen> {
           ),
           const SizedBox(height: 20),
 
-          // --- Name, Department, and OTP fields (Conditionally Visible) ---
           if (_currentStep == AuthStep.enterDetailsAndSendOtp || _currentStep == AuthStep.otpSent) ...[
-            // Show Name and Department only if user does NOT exist
             if (!_userExists) ...[
               TextFormField(
                 controller: _nameController,
@@ -422,8 +361,6 @@ class _RequestAccessScreenState extends State<RequestAccessScreen> {
               ),
               const SizedBox(height: 20),
             ],
-
-            // Show OTP field only after OTP has been sent
             if (_currentStep == AuthStep.otpSent) ...[
               TextFormField(
                 controller: _otpController,
@@ -454,7 +391,6 @@ class _RequestAccessScreenState extends State<RequestAccessScreen> {
           ],
           const SizedBox(height: 30),
 
-          // --- Main Button ---
           _isLoading
               ? const Center(child: CircularProgressIndicator())
               : SizedBox(
@@ -482,21 +418,15 @@ class _RequestAccessScreenState extends State<RequestAccessScreen> {
         const Icon(Icons.check_circle_outline, color: Colors.green, size: 80),
         const SizedBox(height: 20),
         Text(
-          'Your access request has been submitted successfully!',
+          'Your access request has been submitted!',
           textAlign: TextAlign.center,
           style: Theme.of(context).textTheme.headlineSmall,
         ),
         const SizedBox(height: 10),
         Text(
-          'Please wait for administrator approval. You will be notified when your request is reviewed.',
+          'Please wait for administrator approval. The app will unlock automatically once your request is reviewed.',
           textAlign: TextAlign.center,
           style: Theme.of(context).textTheme.bodyMedium,
-        ),
-        const SizedBox(height: 20),
-        Text(
-          'In case of any errors in the submitted information, please contact the administrator.',
-          textAlign: TextAlign.center,
-          style: Theme.of(context).textTheme.bodySmall,
         ),
       ],
     );
