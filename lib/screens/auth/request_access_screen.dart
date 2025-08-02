@@ -5,9 +5,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:http/http.dart' as http;
 import 'package:country_picker/country_picker.dart';
 
-import '../../models/user_request.dart';
-import '../../api/firestore_service.dart';
 import '../../api/device_auth_service.dart';
+import '../../api/backend_service.dart';
 
 // Enum to manage the current step of the UI
 enum AuthStep {
@@ -33,8 +32,9 @@ class _RequestAccessScreenState extends State<RequestAccessScreen> {
   final _mobileController = TextEditingController();
   final _otpController = TextEditingController();
 
-  final FirestoreService _firestoreService = FirestoreService();
   final DeviceAuthService _authService = DeviceAuthService();
+  // NEW: Use the new BackendService instead of FirestoreService
+  final BackendService _backendService = BackendService();
 
   // State management variables
   AuthStep _currentStep = AuthStep.enterNumber;
@@ -62,7 +62,6 @@ class _RequestAccessScreenState extends State<RequestAccessScreen> {
     e164Key: '91-IN-0',
   );
 
-
   @override
   void initState() {
     super.initState();
@@ -85,8 +84,9 @@ class _RequestAccessScreenState extends State<RequestAccessScreen> {
     _otpController.dispose();
     super.dispose();
   }
-  // --- NEW: Step 1 - Verify if the mobile number exists ---
-Future<void> _checkNumberExists() async {
+
+  // --- Step 1 - Verify if the mobile number exists ---
+  Future<void> _checkNumberExists() async {
     if (!_formKey.currentState!.validate()) {
       return;
     }
@@ -112,20 +112,17 @@ Future<void> _checkNumberExists() async {
         setState(() {
           _userExists = userExists;
           if (!userExists) {
-            // If user does not exist, get the list of departments
             final List<dynamic> departmentData = responseData['departments'];
             _departments = departmentData.map((d) => d.toString()).toList();
           }
           _currentStep = AuthStep.enterDetailsAndSendOtp;
         });
       } else if (response.statusCode == 403) {
-        // Specific handling for the "mobileNo not allowed" error
         _showErrorSnackbar('Mobile number not allowed');
         setState(() {
           _currentStep = AuthStep.enterNumber;
         });
       } else {
-        // Handle other API errors (e.g., 400, 500)
         final errorData = json.decode(response.body);
         _showErrorSnackbar(errorData['message'] ?? 'An unknown error occurred.');
         setState(() {
@@ -135,9 +132,9 @@ Future<void> _checkNumberExists() async {
     } catch (e) {
       debugPrint("Error checking number: $e");
       _showErrorSnackbar('Could not connect to the server. Please try again.');
-       setState(() {
-          _currentStep = AuthStep.enterNumber;
-        });
+      setState(() {
+        _currentStep = AuthStep.enterNumber;
+      });
     } finally {
       setState(() {
         _isLoading = false;
@@ -145,7 +142,7 @@ Future<void> _checkNumberExists() async {
     }
   }
 
-  // --- UPDATED: Step 2 - Send OTP ---
+  // --- Step 2 - Send OTP ---
   Future<void> _sendOtp() async {
     if (!_formKey.currentState!.validate()) {
       return;
@@ -154,7 +151,6 @@ Future<void> _checkNumberExists() async {
       _isLoading = true;
     });
 
-    // Use the selected country code
     final mobileNumber = '+${_selectedCountry.phoneCode}${_mobileController.text.trim()}';
 
     await FirebaseAuth.instance.verifyPhoneNumber(
@@ -188,7 +184,7 @@ Future<void> _checkNumberExists() async {
     );
   }
 
-  // --- UPDATED: Step 3 - Verify OTP and Submit ---
+  // --- Step 3 - Verify OTP and Register with the backend ---
   Future<void> _verifyOtpAndSubmit() async {
     if (!_formKey.currentState!.validate()) {
       return;
@@ -207,61 +203,72 @@ Future<void> _checkNumberExists() async {
 
       // Sign in to confirm the user owns the number
       await FirebaseAuth.instance.signInWithCredential(credential);
-      // If successful, proceed to submit the request to Firestore
-      await _submitRequest();
-
+      // If successful, proceed to register on your own server
+      await _registerUserOnServer();
     } on FirebaseAuthException catch (e) {
       debugPrint('OTP Verification Failed: ${e.message}');
       _showErrorSnackbar('OTP verification failed: ${e.message}');
       // Revert step to allow re-entry of OTP
       setState(() { _currentStep = AuthStep.otpSent; });
-    } finally {
-      // Final loading state is handled within _submitRequest
-       if (_currentStep != AuthStep.submitting) {
-         setState(() { _isLoading = false; });
-       }
     }
+    // The finally block is removed as loading state is handled in _registerUserOnServer
   }
 
-  // --- UPDATED: Final Step - Submit data to Firestore ---
-  Future<void> _submitRequest() async {
+   // --- Final Step - Submit data to your backend server ---
+  Future<void> _registerUserOnServer() async {
     final name = _nameController.text.trim();
-    // Use the selected country code for the final data
     final mobile = '+${_selectedCountry.phoneCode}${_mobileController.text.trim()}';
     final deviceId = await _authService.getDeviceIdentifier();
+    final department = _userExists ? null : _selectedDepartment; // Use null if user exists
 
-    if (deviceId != null) {
-      final userRequest = UserRequest(
-        name: name,
-        mobile: mobile,
-        deviceId: deviceId,
-        department: _userExists ? '' : _selectedDepartment!,
-        timestamp: DateTime.now(),
-      );
-
-      try {
-        final success = await _firestoreService.sendLoginRequest(userRequest);
-        if (success) {
-          setState(() {
-            _requestSent = true;
-          });
-        } else {
-          _showErrorSnackbar('Failed to submit request. Please try again.');
-          setState(() { _currentStep = AuthStep.otpSent; });
-        }
-      } catch (e) {
-        debugPrint("Error submitting request to Firestore: $e");
-        _showErrorSnackbar('An error occurred. Please try again.');
-        setState(() { _currentStep = AuthStep.otpSent; });
-      }
-    } else {
-      _showErrorSnackbar('Could not retrieve device ID. Cannot submit request.');
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      _showErrorSnackbar('User not authenticated with Firebase.');
       setState(() { _currentStep = AuthStep.otpSent; });
+      return;
     }
 
+    // Await the token. Note that the return type is 'String?'.
+    final String? token = await user.getIdToken();
+
+    // FIX: Check if the token is null before proceeding.
+    if (token == null) {
+      _showErrorSnackbar('Failed to get authentication token. Please try again.');
+      setState(() { _currentStep = AuthStep.otpSent; });
+      return;
+    }
+
+    // Now that we've checked for null, we can safely use the non-nullable token variable.
+    final requestBody = RegisterRequest(
+      token: token,
+      username: _userExists ? null : name,
+      department: department,
+    );
+
     setState(() {
-      _isLoading = false;
+      _isLoading = true;
     });
+
+    try {
+      final success = await _backendService.registerUser(requestBody);
+
+      if (success) {
+        setState(() {
+          _requestSent = true;
+        });
+      } else {
+        _showErrorSnackbar('Failed to submit request. Please try again.');
+        setState(() { _currentStep = AuthStep.otpSent; });
+      }
+    } catch (e) {
+      debugPrint("Error registering user: $e");
+      _showErrorSnackbar(e.toString());
+      setState(() { _currentStep = AuthStep.otpSent; });
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
   }
 
   void _showErrorSnackbar(String message) {
