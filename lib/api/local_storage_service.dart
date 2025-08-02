@@ -1,42 +1,67 @@
-// local_storage_service.dart
+// lib/api/local_storage_service.dart
 import 'package:shared_preferences/shared_preferences.dart';
-import 'dart:convert'; // Import for JSON encoding/decoding
+import 'dart:convert';
 
 class LocalAuthService {
-  static const String _authStatusKey = 'isLoggedIn';
+  // --- Key Definitions ---
+  static const String _authTokenKey = 'authToken'; // For your custom backend token (sid)
+  static const String _userTypeKey = 'userType';   // For the user's approval status
   static const String _userProfileKey = 'userProfile';
+  static const String _blockedNumbersKey = 'blockedNumbers';
+  static const String _reportedNumbersKey = 'reportedNumbers';
 
-  // NEW: Key for locally stored blocked numbers
-  static const String _blockedNumbersKey = 'blockedNumbers'; 
+  // --- Auth Token Management ---
 
-  // Check if the user is marked as logged in locally
-  Future<bool> isUserLoggedInLocally() async {
+  /// Saves the custom authentication token (sid) from your backend.
+  Future<void> saveAuthToken(String token) async {
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getBool(_authStatusKey) ?? false;
+    await prefs.setString(_authTokenKey, token);
   }
 
-  // Save the logged-in status to the device
-  Future<void> saveLoginStatus(bool isLoggedIn) async {
+  /// Retrieves the custom authentication token.
+  Future<String?> getAuthToken() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(_authStatusKey, isLoggedIn);
+    return prefs.getString(_authTokenKey);
   }
 
-  // Clear the logged-in status (for logout)
-  Future<void> clearLoginStatus() async {
+  // --- User Type Management ---
+
+  /// Saves the user's type (1 for pending, 2 for approved).
+  Future<void> saveUserType(int userType) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_authStatusKey);
-    await prefs.remove(_userProfileKey); // Clear profile on logout
-    await prefs.remove(LocalReportedNumbersStorage._reportedNumbersKey); // Clear reported numbers
-    await prefs.remove(_blockedNumbersKey); // NEW: Clear locally stored blocked numbers
+    await prefs.setInt(_userTypeKey, userType);
   }
 
-  // Save user profile data
+  /// Retrieves the user's type.
+  Future<int?> getUserType() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getInt(_userTypeKey);
+  }
+
+  // --- Profile and Status Management ---
+
+  /// Checks if a user token exists, indicating they have started the registration process.
+  Future<bool> hasToken() async {
+    final token = await getAuthToken();
+    return token != null && token.isNotEmpty;
+  }
+
+  /// Clears all authentication and profile data upon logout or access revocation.
+  Future<void> clearAllData() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_authTokenKey);
+    await prefs.remove(_userTypeKey);
+    await prefs.remove(_userProfileKey);
+    await prefs.remove(_reportedNumbersKey);
+    await prefs.remove(_blockedNumbersKey);
+  }
+
+  // --- User Profile (No changes needed here) ---
   Future<void> saveUserProfile(Map<String, String> profileData) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_userProfileKey, json.encode(profileData));
   }
 
-  // Get user profile data
   Future<Map<String, String>> getUserProfile() async {
     final prefs = await SharedPreferences.getInstance();
     final String? profileString = prefs.getString(_userProfileKey);
@@ -47,13 +72,12 @@ class LocalAuthService {
   }
 }
 
-// New class for managing locally reported numbers
+// --- Local Reported Numbers (No changes needed here) ---
 class LocalReportedNumbersStorage {
   static const String _reportedNumbersKey = 'reportedNumbers';
   LocalReportedNumbersStorage._();
   static final instance = LocalReportedNumbersStorage._();
 
-  // Add a reported number to local storage
   Future<void> addReportedNumber(Map<String, dynamic> report) async {
     final prefs = await SharedPreferences.getInstance();
     List<dynamic> currentReports = [];
@@ -65,7 +89,6 @@ class LocalReportedNumbersStorage {
     await prefs.setString(_reportedNumbersKey, json.encode(currentReports));
   }
 
-  // Get all reported numbers from local storage
   Future<List<Map<String, dynamic>>> getReportedNumbers() async {
     final prefs = await SharedPreferences.getInstance();
     final String? reportsString = prefs.getString(_reportedNumbersKey);
@@ -76,7 +99,6 @@ class LocalReportedNumbersStorage {
     return [];
   }
 
-  // Clear all reported numbers from local storage
   Future<void> clearReportedNumbers() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_reportedNumbersKey);
