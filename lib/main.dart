@@ -11,7 +11,7 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   // Initialize Firebase
   await Firebase.initializeApp();
-  await channel.invokeMethod<bool>('TriggerSnapshot');
+  //await channel.invokeMethod<bool>('TriggerSnapshot');
 
   // final Map<String, String> m = {"number":"+911098765431"};
   // print((await channel.invokeMethod('CheckBlocked',m)) ?? false);

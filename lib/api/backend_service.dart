@@ -24,7 +24,7 @@ class RegisterRequest {
 }
 
 class BackendService {
-  final String _baseUrl = 'enter your backend url here'; 
+  final String _baseUrl = 'http://10.251.0.182:3000/api'; 
 
   /// Registers a new user on the custom backend server.
   /// Throws an [Exception] if the registration fails.
@@ -38,6 +38,7 @@ class BackendService {
 
     if (response.statusCode == 200) {
       final responseData = json.decode(response.body);
+      print('Registration Response: $responseData');
       if (responseData['error'] == false) {
         return true;
       } else {

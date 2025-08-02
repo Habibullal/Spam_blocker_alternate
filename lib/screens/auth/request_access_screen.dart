@@ -98,7 +98,7 @@ class _RequestAccessScreenState extends State<RequestAccessScreen> {
 
     try {
       // IMPORTANT: Replace with your actual backend URL
-      final url = Uri.parse('http://172.18.224.1:3000/api/check');
+      final url = Uri.parse('http://10.251.0.182:3000/api/check');
       final response = await http.post(
         url,
         headers: {'Content-Type': 'application/json'},
@@ -107,6 +107,7 @@ class _RequestAccessScreenState extends State<RequestAccessScreen> {
 
       if (response.statusCode == 200) {
         final responseData = json.decode(response.body);
+        print('Response Data: $responseData');
         final userExists = responseData['exists'] == 1;
 
         setState(() {

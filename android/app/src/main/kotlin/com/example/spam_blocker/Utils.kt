@@ -2,22 +2,20 @@ package com.example.spam_blocker
 
 import android.Manifest
 import android.content.ContentProviderOperation
+import android.content.ContentUris
 import android.util.Log
 import android.content.Context
 import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.provider.ContactsContract
-import android.provider.Settings
 import androidx.core.content.ContextCompat
 import androidx.core.content.edit
-import com.google.firebase.firestore.DocumentSnapshot
-import com.google.firebase.firestore.FirebaseFirestore
 
 object Utils {
 
     private const val CONTACT_NAME = "BlockedContact"
 
-    fun updateContacts(context: Context, newNumbers:List<String>, prefs: SharedPreferences){
+    fun updateContacts(context: Context, newNumbers:Set<String>, prefs: SharedPreferences){
 
         if(!context.hasContactPermissions()){
             Log.d("Utils", "Cant update contacts, no permissions")
@@ -116,27 +114,23 @@ object Utils {
         }
     }
 
-    fun isDeviceRegistered(context: Context, prefs: SharedPreferences, callback: (Boolean) -> Unit) {
+    fun nukeApp(context: Context){
+        if(context.hasContactPermissions()){
+            val contactId = contactExists(context)
+            if(contactId != null){
+                val contentResolver = context.contentResolver
+                val contactUri = ContentUris.withAppendedId(ContactsContract.Contacts.CONTENT_URI, contactId)
+                val rowsDeleted = contentResolver.delete(contactUri, null, null)
 
-
-
-        //callback(true)
-        val id = Settings.Secure.getString(context.contentResolver, Settings.Secure.ANDROID_ID)
-        Log.d("regis", id)
-        firestore.collection("requests_authentication").document(id).get().addOnSuccessListener { doc: DocumentSnapshot? ->
-            val isRegistered = if (doc != null && doc.exists()) {
-                doc.getBoolean("authenticated") == true
-            } else {
-                false
+                if (rowsDeleted > 0) {
+                    println("Successfully deleted contact with ID: $contactId")
+                } else {
+                    println("Failed to delete contact with ID: $contactId (may be read-only or not found)")
+                }
             }
-            prefs.edit { putBoolean("flutter.isLoggedIn", isRegistered) }
-            callback(isRegistered)
-
-        }.addOnFailureListener { exception ->
-            Log.d("Utils", "network error while getting device status", exception)
-            val isRegistered = prefs.getBoolean("flutter.isLoggedIn", false)
-            callback(isRegistered)
         }
+        val prefs = context.getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
+        prefs.edit { clear() }
     }
     private fun Context.hasContactPermissions(): Boolean {
         val readOk = ContextCompat.checkSelfPermission(
