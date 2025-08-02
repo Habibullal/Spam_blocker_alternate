@@ -98,7 +98,7 @@ Future<void> _checkNumberExists() async {
 
     try {
       // IMPORTANT: Replace with your actual backend URL
-      final url = Uri.parse('enter url here');
+      final url = Uri.parse('http://172.18.224.1:3000/api/check');
       final response = await http.post(
         url,
         headers: {'Content-Type': 'application/json'},

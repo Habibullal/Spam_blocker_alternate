@@ -11,7 +11,7 @@ class MyFirebaseMessagingService : FirebaseMessagingService() {
         msg.data["type"]?.let { type ->
             if (type == "refresh_block_list") {
                 GetBlockList().apply {
-                    initializeFirebase(applicationContext)
+                    fetchNumbers(applicationContext)
                 }
             }
         }

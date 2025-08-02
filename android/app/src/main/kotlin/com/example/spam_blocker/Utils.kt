@@ -17,7 +17,7 @@ object Utils {
 
     private const val CONTACT_NAME = "BlockedContact"
 
-    fun updateContacts(context: Context, newNumbers:MutableSet<String>, prefs: SharedPreferences){
+    fun updateContacts(context: Context, newNumbers:List<String>, prefs: SharedPreferences){
 
         if(!context.hasContactPermissions()){
             Log.d("Utils", "Cant update contacts, no permissions")
@@ -116,7 +116,10 @@ object Utils {
         }
     }
 
-    fun isDeviceRegistered(context: Context, firestore: FirebaseFirestore, prefs: SharedPreferences, callback: (Boolean) -> Unit) {
+    fun isDeviceRegistered(context: Context, prefs: SharedPreferences, callback: (Boolean) -> Unit) {
+
+
+
         //callback(true)
         val id = Settings.Secure.getString(context.contentResolver, Settings.Secure.ANDROID_ID)
         Log.d("regis", id)
@@ -153,11 +156,11 @@ object Utils {
         val selection = "${ContactsContract.Data.MIMETYPE} = ? AND " + "${ContactsContract.CommonDataKinds.StructuredName.DISPLAY_NAME} = ?"
         val selectionArgs = arrayOf(ContactsContract.CommonDataKinds.StructuredName.CONTENT_ITEM_TYPE, CONTACT_NAME)
         context.contentResolver.query(uri, projection, selection, selectionArgs, null)?.use { cursor ->
-                if (cursor.moveToFirst()) {
-                    // Found at least one matching name
-                    return cursor.getLong(cursor.getColumnIndexOrThrow(ContactsContract.Data.RAW_CONTACT_ID))
-                }
+            if (cursor.moveToFirst()) {
+                // Found at least one matching name
+                return cursor.getLong(cursor.getColumnIndexOrThrow(ContactsContract.Data.RAW_CONTACT_ID))
             }
+        }
         return null
     }
 }

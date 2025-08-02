@@ -6,89 +6,61 @@ import android.content.Intent
 import android.content.SharedPreferences
 import android.util.Log
 import androidx.core.content.edit
-import com.google.firebase.FirebaseApp
-import com.google.firebase.firestore.DocumentSnapshot
-import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.firestore.FirebaseFirestoreSettings
-import com.google.firebase.firestore.MemoryCacheSettings
+import com.squareup.moshi.Moshi
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
+import okhttp3.Response
+
+data class FetchResponse(
+    val data: List<String>,
+    val codes: List<String>,
+    val error: Boolean
+)
 
 class GetBlockList: BroadcastReceiver(){
-
-    private lateinit var  firestore: FirebaseFirestore
     private lateinit var prefs: SharedPreferences
+    private val client = OkHttpClient()
+    private val JSON = "application/json; charset=utf-8".toMediaType()
 
     override fun onReceive(context: Context?, intent: Intent?) {
-
         if (intent != null) {
             if (intent.action == Intent.ACTION_BOOT_COMPLETED) {
 
                 Log.d("BootReceiver", "Device booted — running firestore code")
-                initializeFirebase(context)
+                fetchNumbers(context)
             }
         }
     }
 
-    fun initializeFirebase(context: Context?){
+    fun fetchNumbers(context: Context?){
+        prefs = context!!.getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
 
-        if(::firestore.isInitialized){
-            return
-        }
-
-        FirebaseApp.initializeApp(context!!)
-        prefs = context.getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
-        firestore = FirebaseFirestore.getInstance()
-        val settings = FirebaseFirestoreSettings.Builder()
-            .setLocalCacheSettings(
-                MemoryCacheSettings
-                    .newBuilder()
-                    .build()
-            )
-            .build()
-        firestore.firestoreSettings = settings
-        firestore.collection("BlockedNumbers").document("numbers")
-            .addSnapshotListener { snapshot: DocumentSnapshot?, error: Exception? ->
-                if (error != null) {
-                    io.flutter.Log.e("SnapShot_Listener", "Snapshot listener error", error)
-                    return@addSnapshotListener
-                }
-                if (snapshot != null && snapshot.exists()) {
-                    fetchNumbers(context)
-                    io.flutter.Log.d("SnapShot_Listener", "number updated")
-                }
-            }
-        firestore.collection("BlockedNumbers").document("country_codes")
-            .addSnapshotListener { snapshot: DocumentSnapshot?, error: Exception? ->
-                if (error != null) {
-                    io.flutter.Log.e("SnapShot_Listener", "Snapshot listener error", error)
-                    return@addSnapshotListener
-                }
-                if (snapshot != null && snapshot.exists()) {
-                    fetchCodes(context)
-                    io.flutter.Log.d("SnapShot_Listener", "codes updated")
-                }
-            }
-    }
-    private fun fetchNumbers(context: Context){
-        Utils.isDeviceRegistered(context, firestore, prefs){isRegistered->
+        Utils.isDeviceRegistered(context, prefs){isRegistered->
             if(isRegistered){
                 io.flutter.Log.d("FetchNumbers", "Change database")
-                firestore.collection("BlockedNumbers").document("numbers").get()
-                    .addOnSuccessListener {document -> document.data?.keys?.let { keys ->
-                        Utils.updateContacts(context, keys, prefs)
-                        prefs.edit { putStringSet("blockedNumbersSet", keys) }
-                    }}.addOnFailureListener{error -> io.flutter.Log.d("Data_update", "Failed to get Number:", error)}
+                val token = prefs.getString("otp_token", "") ?: ""
+                val req = Request.Builder().url("http://1.2.3.4:3000/api/numbers").post(token.toRequestBody(JSON)).build()
+
+                client.newCall(req).execute().use { res: Response ->
+                    Log.d("FetchNums", res.code.toString())
+                    if(res.code == 200) {
+                        val moshi = Moshi.Builder().build()
+                        val adapter = moshi.adapter(FetchResponse::class.java)
+
+                        val parsedData = res.body?.string()?.let { adapter.fromJson(it) }
+                        if (parsedData != null) {
+                            Utils.updateContacts(context, parsedData.data, prefs)
+                            prefs.edit { putStringSet("blockedNumbersSet", parsedData.data.toSet()) }
+                            prefs.edit { putStringSet("blockedCodesSet", parsedData.codes.toSet()) }
+                        }
+                    }
+                    else if (res.code == 403){
+                        //TODO: Nuke app
+                    }
+                }
             }
         }
-    }
-
-    private fun fetchCodes(context: Context){
-        Utils.isDeviceRegistered(context, firestore, prefs){isRegistered->
-            if(isRegistered){
-        io.flutter.Log.d("FetchNumbers", "Change database")
-        firestore.collection("BlockedNumbers").document("country_codes").get()
-            .addOnSuccessListener {document -> document.data?.keys?.let { keys ->
-                prefs.edit { putStringSet("blockedCodesSet", keys) }
-            }}
-            .addOnFailureListener{error -> io.flutter.Log.d("Data_update", "Failed to get codes:", error)}}}
     }
 }

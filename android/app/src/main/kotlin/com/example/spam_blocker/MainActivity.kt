@@ -41,7 +41,7 @@ class MainActivity: FlutterActivity() {
     methodChannel.setMethodCallHandler { call, result ->
       when (call.method) {
         "TriggerSnapshot" -> {
-          GetBlockList().initializeFirebase(this)
+          GetBlockList().fetchNumbers(this)
           result.success(true)
         }
 

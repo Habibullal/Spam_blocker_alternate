@@ -47,7 +47,7 @@ class AppThemes {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
     ),
-    cardTheme: CardTheme(
+    cardTheme: CardThemeData(
       elevation: 2,
       shadowColor: const Color(0x0A000000),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -101,7 +101,7 @@ class AppThemes {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
     ),
-    cardTheme: CardTheme(
+    cardTheme: CardThemeData(
       elevation: 2,
       shadowColor: const Color(0x1AFFFFFF),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
